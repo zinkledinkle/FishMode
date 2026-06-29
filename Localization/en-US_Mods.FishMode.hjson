@@ -1,0 +1,22 @@
+Configs: {
+	FishModeConfig: {
+		DisplayName: Fish Mode Config
+
+		BodySegmentCount: {
+			Label: Body Segment Count
+			Tooltip: ""
+		}
+
+		BodyWidth: {
+			Label: Body Width
+			Tooltip: ""
+		}
+
+		BodyLength: {
+			Label: Body Length
+			Tooltip: ""
+		}
+	}
+}
+
+Keybinds.Dash.DisplayName: Dash

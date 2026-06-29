@@ -1,0 +1,3 @@
+displayName = Fish Mode
+author = Zinkle
+version = 0.1

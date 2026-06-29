@@ -59,8 +59,8 @@ public class FishPlayer : ModPlayer
     {
         var c = new ILCursor(il);
 
-        var loopIndexLocation = c.Body.Variables.Count + 1;
-        var pointCountLocation = c.Body.Variables.Count + 2;
+        var loopIndexA = c.Body.Variables.Count;
+        il.Body.Variables.Add(new VariableDefinition(il.Import(typeof(int)))); 
 
         if (!c.TryGotoNext(i => i.MatchLdloca(0))) return;
         c.RemoveRange(14);
@@ -69,33 +69,40 @@ public class FishPlayer : ModPlayer
         var endLoopLabel = il.DefineLabel();
 
         c.EmitLdcI4(0);
-        c.EmitStloc(pointCountLocation); //the amount of points, will be assigned in the hitbox creation cause its just easiest
-        c.EmitLdcI4(0);
-        c.EmitStloc(loopIndexLocation); //for loop index
+        c.EmitStloc(loopIndexA); //for loop index
         c.EmitBr(endLoopLabel);
 
         c.MarkLabel(loopLabel); //start of loop
 
         c.EmitLdloca(0); //load rect address
-        c.EmitLdloc(loopIndexLocation); //load index
+        c.EmitLdloc(loopIndexA); //load index
         c.EmitLdarg0(); //load player instance
-        c.EmitLdloca(pointCountLocation); //load point count address
-        c.EmitDelegate((ref Rectangle rect, int index, Player self, ref int pointCount) =>
+        c.EmitDelegate((ref Rectangle rect, int index, Player self) =>
         {
             var body = self.GetModPlayer<FishPlayer>().Body;
             var point = body.particles[index];
-            pointCount = body.particles.Count;
             var pos = point.Position;
             var radius = point.Radius;
             rect = new((int)(pos.X - radius), (int)(pos.Y - radius), (int)radius * 2, (int)radius * 2);
+
+            Dust.QuickDust(pos, Color.White);
         });
 
         c.GotoNext(i => i.MatchRet());
 
         c.MarkLabel(endLoopLabel);
-        c.EmitLdloc(loopIndexLocation);
-        c.EmitLdloc(pointCountLocation);
+
+        c.EmitLdloc(loopIndexA);
+        c.EmitLdcI4(1);
+        c.EmitAdd();
+        c.EmitStloc(loopIndexA);
+
+        c.EmitLdloc(loopIndexA);
+        c.EmitLdarg0();
+        c.EmitDelegate((Player self) => self.GetModPlayer<FishPlayer>().Body.particles.Count);
         c.EmitBlt(loopLabel);
+
+        MonoModHooks.DumpIL(Mod, il);
     }
 
     private void DrownOverride(On_Player.orig_CheckDrowning orig, Player self)

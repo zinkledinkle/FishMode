@@ -10,7 +10,7 @@ public class DistanceConstraint(IParticle particleA, IParticle particleB, float 
     public float Distance { get; } = distance;
     public float StretchResistance { get; } = stretchResistance;
     public float SquishResistance { get; } = squishResistance;
-    public int IterationCount { get; } = iterations;
+    public int IterationCount { get; set; } = iterations;
     public void Apply()
     {
         float distance = Vector2.Distance(ParticleA.Position, ParticleB.Position);

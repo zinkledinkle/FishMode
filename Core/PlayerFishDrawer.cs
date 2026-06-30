@@ -1,4 +1,3 @@
-using FishMode.Core.Physics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Generic;
@@ -44,18 +43,32 @@ public class PlayerFishDrawer : ILoadable
         effect.CurrentTechnique.Passes[0].Apply();
         gd.DrawUserPrimitives(PrimitiveType.TriangleList, [..vertices], 0, vertices.Count / 3);
 
-        //Main.spriteBatch.Begin();
-        //Main.spriteBatch.transformMatrix = Main.GameViewMatrix.TransformationMatrix;
-        //foreach (var player in Main.ActivePlayers)
-        //{
-        //    var fplr = player.GetModPlayer<FishPlayer>();
-        //    foreach (var particle in fplr.Body.particles)
-        //    {
-        //        var rect = new Rectangle((int)(particle.Position.X - particle.Radius - Main.screenPosition.X), (int)(particle.Position.Y - particle.Radius - Main.screenPosition.Y), (int)(particle.Radius * 2), (int)(particle.Radius * 2));
-        //        Main.spriteBatch.Draw(TextureAssets.Extra[ExtrasID.MoonLordEye].Value, rect, Color.White * 0.3f);
-        //    }
-        //}
-        //Main.spriteBatch.End();
+        if (!ModContent.GetInstance<FishModeConfig>().DebugDraw) return;
+
+        Main.spriteBatch.Begin();
+        Main.spriteBatch.transformMatrix = Main.GameViewMatrix.TransformationMatrix;
+        foreach (var player in Main.ActivePlayers)
+        {
+            var fplr = player.GetModPlayer<FishPlayer>();
+            foreach (var particle in fplr.Body.particles)
+            {
+                foreach (var constraint in particle.Constraints)
+                {
+                    var px = TextureAssets.MagicPixel.Value;
+                    var width = 2f;
+                    var length = constraint.ParticleB.Position.Distance(particle.Position);
+
+                    var scale = new Vector2(width / px.Width, length / px.Height);
+                    var og = px.Size() / 2f;
+                    var rot = constraint.ParticleB.Position.DirectionTo(particle.Position).ToRotation() + MathHelper.PiOver2;
+                    Main.spriteBatch.Draw(px, (particle.Position + constraint.ParticleB.Position) / 2f - Main.screenPosition, null, Color.White, rot, og, scale, SpriteEffects.None, 0f);
+                }
+
+                var rect = new Rectangle((int)(particle.Position.X - particle.Radius - Main.screenPosition.X), (int)(particle.Position.Y - particle.Radius - Main.screenPosition.Y), (int)(particle.Radius * 2), (int)(particle.Radius * 2));
+                Main.spriteBatch.Draw(TextureAssets.Extra[ExtrasID.MoonLordEye].Value, rect, Color.White * 1f);
+            }
+        }
+        Main.spriteBatch.End();
     }
 
     public void Unload() { }
@@ -72,7 +85,7 @@ public class PlayerFishDrawer : ILoadable
             points.Insert(0, points[0] - (points[1] - points[0]));
             points.Add(points[^1] + (points[^1] - points[^2]));
 
-            float width = PlayerFishBody.Width; //this is just for the main body, extra padding will be added for more space
+            float width = fplr.Body.particles[0].Radius * 2f; //this is just for the main body, extra padding will be added for more space
             float targetWidth = (float)PlayerRenderTarget.Target.Width;
             float widthRatio = targetWidth / width;
 

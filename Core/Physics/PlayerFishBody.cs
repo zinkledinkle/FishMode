@@ -3,49 +3,89 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Terraria;
-using Terraria.ID;
 using Terraria.ModLoader;
 
 namespace FishMode.Core.Physics;
 
 public class PlayerFishBody
 {
-    public static int ParticleCount => ModContent.GetInstance<FishModeConfig>().BodySegmentCount;
+    private const float baseSegmentMass = 3f;
+    private const float constraintSquishResist = 0.1f;
+    private const float constraintStretchResist = 0.3f;
     public static float Width => ModContent.GetInstance<FishModeConfig>().BodyWidth;
-    public static float Height => ModContent.GetInstance<FishModeConfig>().BodyLength;
+    public static float SegmentLength => ModContent.GetInstance<FishModeConfig>().BaseSegmentLength;
     public readonly List<PlayerParticle> particles = [];
-    public bool Grounded => particles.Any(p => p.Grounded);
-    public PlayerFishBody(Player player)
+    public bool Grounded => particles.Count(p => p.Grounded) > particles.Count / 2;
+    public bool Submerged => particles.Count(p => p.GetLiquid() > -1) > particles.Count / 2;
+    public PlayerFishBody(Player player, int segments)
     {
-        float segmentDistance = Height / (float)ParticleCount;
-        float totalMass = 12f;
-        float headMassRatio = 0.35f; //takes 35% of the mass
-
-        for (int i = 0; i < ParticleCount; i++)
+        for (int i = 0; i < segments; i++)
         {
-            float mass = i == 0 ? totalMass * headMassRatio : (totalMass * (1 - headMassRatio) / (float)(ParticleCount - 2));
-            PlayerParticle particle = new(player.Bottom - Vector2.UnitY * i * segmentDistance, mass, Width / 2f);
+            float mass = i == 0 ? baseSegmentMass * 1.5f : baseSegmentMass;
+            PlayerParticle particle = new(player.Bottom - Vector2.UnitY * i * SegmentLength, mass, Width / 2f);
             particles.Add(particle);
         }
 
-        float squish = 0.2f;
-        float stretch = 0.3f;
-        int iterations = (int)(ParticleCount * 2);
+        int iterations = (int)(segments * 2);
 
-        for(int i = 0; i < ParticleCount - 1; i++)
+        for(int i = 0; i < segments - 1; i++)
         {
             PlayerParticle particleA = particles[i];
-            PlayerParticle particleB = particles[i + 1];
-            DistanceConstraint constraint = new(particleA, particleB, segmentDistance, stretch, squish, iterations);
-            particleA.AddConstraint(constraint);
+            for(int j = i + 1; j < segments; j++)
+            {
+                PlayerParticle particleB = particles[j];
+                int diff = j - i;
+                DistanceConstraint constraint = new(particleA, particleB, SegmentLength * diff, constraintStretchResist, constraintSquishResist, iterations);
+                particleA.AddConstraint(constraint);
+            }
         }
-        for (int i = ParticleCount - 1; i > 0; i--)
+    }
+    public void SetEnviromentalValues(
+    float airDrag = 0.01f,
+    float waterDrag = 0.07f,
+    float lavaDrag = 0.1f,
+    float honeyDrag = 0.2f,
+    float shimmerDrag = 0f,
+    float bounce = 0.3f,
+    float gravity = 0.5f)
+    {
+        foreach(var particle in particles)
+            particle.SetEnviromentalValues(
+                airDrag,
+                waterDrag,
+                lavaDrag,
+                honeyDrag,
+                shimmerDrag,
+                bounce, 
+                gravity
+            );
+    }
+    public void AddSegment()
+    {
+        if (particles.Count >= 10) return;
+
+        var delta = particles[^1].Position - particles[^2].Position;
+        PlayerParticle particle = new(particles[^1].Position + delta, baseSegmentMass, Width / 2f);
+        particles.Add(particle);
+
+        int iterations = (int)(particles.Count * 2);
+
+        for (int i = 0; i < particles.Count - 1; i++)
         {
-            PlayerParticle particleA = particles[i];
-            PlayerParticle particleB = particles[i - 1];
-            DistanceConstraint constraint = new(particleA, particleB, segmentDistance, stretch, squish, iterations);
-            particleA.AddConstraint(constraint);
+            PlayerParticle particleB = particles[i];
+            int diff = particles.Count - 1 - i;
+            DistanceConstraint constraint = new(particleB, particle, SegmentLength * diff, constraintStretchResist, constraintSquishResist, iterations);
+            foreach (var c in particle.Constraints)
+                c.IterationCount = iterations;
+            particleB.AddConstraint(constraint);
         }
+    }
+    public void RemoveSegment()
+    {
+        if (particles.Count <= 2) return;
+        foreach (var particle in particles)
+            particle.Constraints.RemoveAll(c => c.ParticleB == particles[^1]);
+        particles.RemoveAt(particles.Count - 1);
     }
     public void DebugGrab()
     {
@@ -128,191 +168,5 @@ public class PlayerFishBody
                 iterations++;
             }
         }
-    }
-}
-public class PlayerParticle(Vector2 position, float mass, float radius) : IParticle
-{
-#nullable enable
-    public Vector2 Position { get; set; } = position;
-    public Vector2 Velocity { get; set; }
-    public Vector2 Force { get; set; }
-    public float Mass { get; set; } = mass;
-    public float Radius { get; set; } = radius;
-    public bool Frozen { get; set; } = false;
-    public bool Grabbed { get; set; } = false;
-    public bool Grounded { get; set; } = false;
-    public List<IConstraint> Constraints { get; set; } = [];
-    public void AddConstraint(IConstraint constraint) => Constraints.Add(constraint);
-    public void AddForce(Vector2 force) => Force += force / Mass;
-
-    private static float airDrag = 0.01f;
-    private static float waterDrag = 0.07f;
-    private static float lavaDrag = 0.1f;
-    private static float honeyDrag = 0.2f;
-    private static float shimmerDrag = 0f;
-
-    private static float bounce = 0.7f;
-
-    private static float gravity = 0.5f;
-
-    private static float maxXSpeed = 30f;
-    private static float maxYSpeed = 20f;
-
-    public void Update()
-    {
-        bounce = 0.35f;
-
-        Grounded = false;
-
-        if (Velocity.LengthSquared() > 0.1f) Frozen = false;
-
-        if (Frozen) return;
-
-        if (GetLiquid() == -1)
-        {
-            Force += Vector2.UnitY * gravity;
-        }
-
-        float drag = GetDrag();
-        Velocity -= Velocity * drag;
-
-        TileCollide();
-
-        if (Math.Abs(Velocity.X) > maxXSpeed) Velocity = new(Math.Sign(Velocity.X) * maxXSpeed, Velocity.Y);
-        if (Math.Abs(Velocity.Y) > maxYSpeed) Velocity = new(Velocity.X, Math.Sign(Velocity.Y) * maxYSpeed);
-    }
-    public void Step()
-    {
-        Velocity += Force;
-        Position += Velocity;
-
-        Force = Vector2.Zero;
-    }
-    //remove
-    private static Vector2 GetLineRectangleIntersect(Vector2 p1, Vector2 p2, Rectangle rect)
-    {
-        Vector2 delta = p2 - p1;
-        float tMin = 0f;
-        float tMax = 1f;
-        for (int i = 0; i < 2; i++)
-        {
-            float s = i == 0 ? p1.X : p1.Y;
-            float d = i == 0 ? delta.X : delta.Y;
-
-            float min = i == 0 ? rect.Left : rect.Top;
-            float max = i == 0 ? rect.Right : rect.Bottom;
-
-            if (Math.Abs(d) < 0.0001f)
-            {
-                if (s < min || s > max)
-                    return p2;
-            }
-            else
-            {
-                float t1 = (min - s) / d;
-                float t2 = (max - s) / d;
-                if (t1 > t2) (t1, t2) = (t2, t1); //switcheroo
-                tMin = Math.Max(tMin, t1);
-                tMax = Math.Min(tMax, t2);
-
-                if (tMin > tMax)
-                    return p2;
-            }
-        }
-        return p1 + delta * Math.Clamp(tMin, 0f, 1f);
-    }
-    private static Vector2 ClosestPointOnRect(Vector2 p, Rectangle rect)
-    {
-        return new Vector2(
-            Math.Clamp(p.X, rect.Left, rect.Right),
-            Math.Clamp(p.Y, rect.Top, rect.Bottom)
-        ); //closestpointinrect doesn't work because it just uses the actual sides
-    }
-    public bool TileCollide()
-    {
-        int tileX = (int)(Position.X / 16f);
-        int tileY = (int)(Position.Y / 16f);
-
-        int padding = (int)(Radius / 8f) + 1;
-
-        tileX += Math.Sign(Velocity.X);
-        tileY += Math.Sign(Velocity.Y);
-
-        Grounded = false;
-
-        List<Rectangle> candidates = [];
-
-        for (int x = tileX - padding; x <= tileX + padding; x++)
-        {
-            for (int y = tileY - padding; y <= tileY + padding; y++)
-            {
-                Tile tile = Main.tile[x, y];
-                bool solid = Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType];
-                if (!tile.HasTile || !solid) continue;
-
-                Rectangle tileRect = new(x * 16, y * 16, 16, 16);
-
-                candidates.Add(tileRect);
-            }
-        }
-
-        foreach (var tile in candidates.OrderBy(t => ClosestPointOnRect(Position, t).DistanceSQ(Position)))
-        {
-            Vector2 closestPoint = ClosestPointOnRect(Position, tile);
-            Vector2 delta = (closestPoint - Position);
-            float dist = delta.Length();
-
-            Vector2 normal = delta.SafeNormalize(Vector2.Zero);
-            float velAlongNormal = Vector2.Dot(Velocity, normal);
-
-            if (dist > Radius)
-            {
-                //check if it'll intersect NEXT frame
-                float velMagnitude = Velocity.Length();
-                float distToContact = dist - Radius;
-
-                if (velAlongNormal <= distToContact) continue;
-
-                float normalPenetration = velAlongNormal - Math.Max(0f, distToContact);
-                Position -= normalPenetration * normal;
-
-                Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
-                Grounded = true;
-                break;
-            }
-
-            float penetration = Radius - dist;
-            Position -= penetration * normal;
-            Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
-            Grounded = true;
-            break;
-        }
-
-        return false;
-    }
-    public float GetDrag()
-    {
-        int type = GetLiquid();
-
-        return type switch
-        {
-            LiquidID.Water => waterDrag,
-            LiquidID.Lava => lavaDrag,
-            LiquidID.Honey => honeyDrag,
-            LiquidID.Shimmer => shimmerDrag,
-            _ => airDrag
-        };
-    }
-    public int GetLiquid()
-    {
-        int tileX = (int)(Position.X / 16f);
-        int tileY = (int)(Position.Y / 16f);
-        float yOffset = Position.Y % 16f;
-
-        Tile tile = Main.tile[tileX, tileY];
-        float liquidAmount = tile.LiquidAmount / 255f * 16f;
-        if (liquidAmount + Radius < yOffset || tile.LiquidAmount == 0)
-            return -1;
-        return tile.LiquidType;
     }
 }

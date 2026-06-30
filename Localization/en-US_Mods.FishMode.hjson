@@ -16,6 +16,16 @@ Configs: {
 			Label: Body Length
 			Tooltip: ""
 		}
+
+		BaseSegmentLength: {
+			Label: Base Segment Length
+			Tooltip: ""
+		}
+
+		DebugDraw: {
+			Label: Debug Draw
+			Tooltip: ""
+		}
 	}
 }
 

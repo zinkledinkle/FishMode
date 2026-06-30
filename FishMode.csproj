@@ -3,4 +3,7 @@
 	<ItemGroup>
 		<Publicize Include="tModLoader;ReLogic;FNA" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
 	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="Assets\Sounds\" />
+	</ItemGroup>
 </Project>

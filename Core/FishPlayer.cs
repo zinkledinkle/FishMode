@@ -6,12 +6,14 @@ using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using Terraria;
 using Terraria.Audio;
 using Terraria.DataStructures;
 using Terraria.GameContent;
 using Terraria.GameInput;
 using Terraria.Graphics;
+using Terraria.Graphics.Renderers;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -20,7 +22,14 @@ namespace FishMode.Core;
 public class FishPlayer : ModPlayer
 {
     public PlayerFishBody Body;
-    public PlayerFishBody MeshDebug;
+    private const int baseBodyLength = 5;
+    private int _bodyLength = baseBodyLength;
+    public int BodyLength
+    {
+        get => _bodyLength;
+
+        set => _bodyLength = MathHelper.Clamp(value, 2, 10);
+    }
 
     public bool lastF = false;
     public bool lastG = false;
@@ -31,12 +40,20 @@ public class FishPlayer : ModPlayer
     private int dashCooldown = 0;
     private int dashTime = 0;
 
-    public int dashCooldownTime = 120;
-    public int dashDuration = 5;
-    public float dashSpeed = 40f;
+    public int dashCooldownTime;
+    public int dashDuration;
+    public float dashSpeed;
 
-    List<PlayerParticle> testParticles = [];
+    //wavey stuff
+    private float averageDir;
+    private int waveTimer;
+    private int waveDecayTimer;
+    private bool waveUp;
+    private float waveAccel;
 
+    private readonly List<PlayerParticle> testParticles = [];
+
+    #region edits
     public override void Load()
     {
         On_Player.Teleport += (orig, self, pos, style, extraInfo) =>
@@ -53,8 +70,64 @@ public class FishPlayer : ModPlayer
         On_Player.JumpMovement += (orig, self) => { if (!disable) orig(self); };
         On_Player.CheckDrowning += DrownOverride;
         IL_Player.Update_NPCCollision += NPCColliision;
+        IL_Projectile.HurtPlayer += ProjectileCollision;
     }
 
+    private void ProjectileCollision(ILContext il)
+    {
+        var c = new ILCursor(il);
+
+        var loopIndexA = c.Body.Variables.Count;
+        il.Body.Variables.Add(new VariableDefinition(il.Import(typeof(int))));
+
+        c.GotoNext(i => i.MatchLdloc0());
+
+        var loopLabel = il.DefineLabel();
+        var endLoopLabel = il.DefineLabel();
+
+        c.EmitLdcI4(0);
+        c.EmitStloc(loopIndexA); //for loop index
+        c.EmitBr(endLoopLabel);
+
+        c.MarkLabel(loopLabel); //start of loop
+
+        c.GotoNext(i => i.MatchRet());
+        c.Remove();
+        c.EmitBr(endLoopLabel); //continue instead of return
+
+        c.GotoNext(i => i.MatchLdarga(1));
+        c.Index++;
+        c.RemoveRange(3);
+        c.EmitLdloc(0); //player
+        c.EmitLdloc(loopIndexA);
+        c.EmitDelegate((ref Rectangle hitbox, Player plr, int index) =>
+        {
+            var body = plr.GetModPlayer<FishPlayer>().Body;
+            var point = body.particles[index];
+            var pos = point.Position;
+            var radius = point.Radius;
+            Rectangle rect = new((int)(pos.X - radius), (int)(pos.Y - radius), (int)radius * 2, (int)radius * 2);
+            return rect.Intersects(hitbox);
+        });
+
+        c.GotoNext(i => i.MatchRet());
+        c.Remove();
+        c.EmitBr(endLoopLabel); //continue instead of return
+
+        c.Index = c.Instrs.Count - 1;
+
+        c.MarkLabel(endLoopLabel);
+
+        c.EmitLdloc(loopIndexA);
+        c.EmitLdcI4(1);
+        c.EmitAdd();
+        c.EmitStloc(loopIndexA);
+
+        c.EmitLdloc(loopIndexA);
+        c.EmitLdarg0();
+        c.EmitDelegate((Player self) => self.GetModPlayer<FishPlayer>().Body.particles.Count);
+        c.EmitBlt(loopLabel);
+    }
     private void NPCColliision(ILContext il)
     {
         var c = new ILCursor(il);
@@ -85,7 +158,7 @@ public class FishPlayer : ModPlayer
             var radius = point.Radius;
             rect = new((int)(pos.X - radius), (int)(pos.Y - radius), (int)radius * 2, (int)radius * 2);
 
-            Dust.QuickDust(pos, Color.White);
+            //Dust.QuickBox(rect.TopLeft(), rect.BottomRight(), 0, Color.White, null);
         });
 
         c.GotoNext(i => i.MatchRet());
@@ -101,10 +174,7 @@ public class FishPlayer : ModPlayer
         c.EmitLdarg0();
         c.EmitDelegate((Player self) => self.GetModPlayer<FishPlayer>().Body.particles.Count);
         c.EmitBlt(loopLabel);
-
-        MonoModHooks.DumpIL(Mod, il);
     }
-
     private void DrownOverride(On_Player.orig_CheckDrowning orig, Player self)
     {
         var body = self.GetModPlayer<FishPlayer>().Body;
@@ -153,23 +223,33 @@ public class FishPlayer : ModPlayer
             }
         }
     }
+    #endregion
 
     public override void OnEnterWorld()
     {
-        Body = new PlayerFishBody(Player);
+        Body = new PlayerFishBody(Player, BodyLength);
         disable = true;
     }
     public override void ResetEffects()
     {
-        if (PlayerInput.GetPressedKeys().Contains(Keys.LeftControl) && Main.mouseRight && Main.mouseRightRelease) Body = new PlayerFishBody(Player);
-        dashCooldownTime = 5;
-        dashDuration = 15;
-        dashSpeed = 5f;
+        Main.NewText(waveAccel);
+        Main.NewText(waveTimer);
+        Main.NewText(waveUp ? "up" : "down");
+        if (PlayerInput.GetPressedKeys().Contains(Keys.LeftControl) && Main.mouseRight && Main.mouseRightRelease) Body = new PlayerFishBody(Player, BodyLength);
 
-        Body?.DebugGrab();
+        dashCooldownTime = 120;
+        dashDuration = 20;
+        dashSpeed = 3f;
+        BodyLength = baseBodyLength;
+
+        Body?.SetEnviromentalValues(); //reset to defaults
 
         dashCooldown = Math.Max(0, dashCooldown - 1);
         dashTime = Math.Max(0, dashTime - 1);
+
+        waveDecayTimer = Math.Max(0, waveDecayTimer - 1);
+        waveTimer = Math.Max(0, waveTimer - 1);
+        if (waveDecayTimer == 0) waveAccel = MathF.Max(0f, waveAccel - 0.01f);
     }
     public override void ProcessTriggers(TriggersSet triggersSet)
     {
@@ -197,8 +277,6 @@ public class FishPlayer : ModPlayer
         {
             Body.Jump(10f + Player.jumpSpeedBoost);
         }
-
-
 
         //if (Main.mouseMiddle && Main.mouseMiddleRelease)
         //{
@@ -244,15 +322,56 @@ public class FishPlayer : ModPlayer
     public override void PreUpdateMovement()
     {
         if (freeze) return;
+
+        Body.SetEnviromentalValues(gravity: Player.gravity * Player.gravDir);
+
+        while (Body.particles.Count < BodyLength)
+            Body.AddSegment();
+        while (Body.particles.Count > BodyLength)
+            Body.RemoveSegment();
+
         Body.Update();
 
         if (Player.controlUp)
         {
-            Body.Propel(2.4f * Player.moveSpeed, 0.3f);
+            Body.Propel(3f * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f), 0.3f);
         }
         if (dashTime > 0)
         {
             Body.Propel(dashSpeed, 0.8f);
+        }
+
+        if (Body.Submerged) WaveShit();
+    }
+    private void WaveShit()
+    {
+        var front = Body.particles[0].Position;
+        var delta = Main.MouseWorld - front;
+
+        var angleTo = MathF.Atan2(delta.Y, delta.X);
+        var angleDelta = MathHelper.WrapAngle(angleTo - averageDir);
+        averageDir = MathHelper.WrapAngle(averageDir + angleDelta * 0.05f);
+
+        float threshold = 0.2f;
+        float increment = 0.15f;
+
+        if (waveTimer > 0) return;
+
+        if (angleDelta > threshold && waveUp)
+        {
+            waveTimer = 15;
+            waveDecayTimer = 40;
+            waveAccel = MathF.Min(waveAccel + increment, 1f);
+            waveUp = false;
+            for (int i = 0; i < 10; i++) Dust.NewDust(front, 16, 16, DustID.AncientLight);
+        }
+        if (angleDelta < -threshold && !waveUp)
+        {
+            waveTimer = 15;
+            waveDecayTimer = 40;
+            waveAccel = MathF.Min(waveAccel + increment, 1f);
+            waveUp = true;
+            for (int i = 0; i < 10; i++) Dust.NewDust(front, 16, 16, DustID.AncientLight);
         }
     }
     public override void PostUpdate()
@@ -262,28 +381,21 @@ public class FishPlayer : ModPlayer
         Vector2 fishPos = Body.particles[0].Position;
         Player.Center = fishPos;
         Player.velocity = Body.particles[0].Velocity;
-        Player.direction = Body.particles[0].Velocity.X > 0 ? 1 : -1;
+
+        if (Math.Abs(Body.particles[0].Velocity.X) > 1) Player.direction = Math.Sign(Body.particles[0].Velocity.X);
     }
     public override void DrawPlayer(Camera camera)
     {
-        foreach (var particle in testParticles)
-        {
-            foreach(var constraint in particle.Constraints)
-            {
-                var px = TextureAssets.MagicPixel.Value;
-                var width = 2f;
-                var length = constraint.ParticleB.Position.Distance(particle.Position);
+        if (!ModContent.GetInstance<FishModeConfig>().DebugDraw) return;
+        var px = TextureAssets.MagicPixel.Value;
+        var width = 2f;
+        var center = Body.particles[0].Position;
+        var length = center.Distance(Main.MouseWorld);
+        var avgDirPos = averageDir.ToRotationVector2() * length + center;
 
-                var scale = new Vector2(width / px.Width, length / px.Height);
-                var og = px.Size() / 2f;
-                var rot = constraint.ParticleB.Position.DirectionTo(particle.Position).ToRotation() + MathHelper.PiOver2;
-                Main.spriteBatch.Draw(px, (particle.Position + constraint.ParticleB.Position) / 2f - Main.screenPosition, null, Color.White, rot, og, scale, SpriteEffects.None, 0f);
-            }
-
-            var rect = new Rectangle((int)(particle.Position.X - particle.Radius - Main.screenPosition.X), (int)(particle.Position.Y - particle.Radius - Main.screenPosition.Y), (int)(particle.Radius * 2), (int)(particle.Radius * 2));
-            Main.spriteBatch.Draw(TextureAssets.Extra[ExtrasID.MoonLordEye].Value, rect, Color.White);
-        }
-        if (PlayerInput.GetPressedKeys().Contains(Keys.RightAlt)) WorldGen.SaveAndQuit();
-        return;
+        var scale = new Vector2(width / px.Width, length / px.Height);
+        var og = px.Size() / 2f;
+        var rot = averageDir + MathHelper.PiOver2;
+        Main.spriteBatch.Draw(px, (avgDirPos + center) / 2f - Main.screenPosition, null, Color.White, rot, og, scale, SpriteEffects.None, 0f);
     }
 }

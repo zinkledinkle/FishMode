@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Terraria;
 using Terraria.DataStructures;
+using Terraria.Graphics.CameraModifiers;
 using Terraria.Graphics.Renderers;
 using Terraria.ModLoader;
 
@@ -118,6 +119,12 @@ public class PlayerFishBody
     }
     private void FallDamage(float magnitude)
     {
+        if (magnitude > 15f)
+        {
+            float strength = MathF.Min(magnitude + (timeInAir * 0.2f), 100f);
+            int time = (int)magnitude + (int)(timeInAir * 0.4f);
+            Main.instance.CameraModifiers.Add(new PunchCameraModifier(Player.Center, Main.rand.NextVector2Circular(1f, 1f), strength, 5f, time, 500f, "splatShake"));
+        }
         if (Player.noFallDmg || Submerged) return;
         float thresh = 12f;
         int mult = 7;

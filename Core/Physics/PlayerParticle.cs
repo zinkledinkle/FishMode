@@ -60,6 +60,12 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     private const float maxXSpeed = 30f;
     private const float maxYSpeed = 30f;
 
+    public int touchingTileType = -1;
+    public int tileX = 0;
+    public int tileY = 0;
+
+    public bool suffocating = false;
+
     public void SetEnviromentalValues(
         float airDrag = 0.01f,
         float waterDrag = 0.07f,
@@ -81,6 +87,7 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     public void Update()
     {
         Grounded = false;
+        suffocating = false;
         timeSinceLastSplat++;
 
         if (Velocity.LengthSquared() > 0.1f) Frozen = false;
@@ -120,20 +127,23 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
 
         int padding = (int)(Radius / 8f) + 1;
 
-        tileX += Math.Sign(Velocity.X);
-        tileY += Math.Sign(Velocity.Y);
-
-        Grounded = false;
+        int addX = Math.Sign(Velocity.X);
+        int addY = Math.Sign(Velocity.Y);
+        int totalSurroundingTiles = 0;
 
         List<Rectangle> candidates = [];
 
-        for (int x = tileX - padding; x <= tileX + padding; x++)
+        for (int x = tileX - padding + addX; x <= tileX + padding + addX; x++)
         {
-            for (int y = tileY - padding; y <= tileY + padding; y++)
+            for (int y = tileY - padding + addY; y <= tileY + padding + addY; y++)
             {
                 Tile tile = Main.tile[x, y];
                 bool solid = Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType];
                 if (!tile.HasTile || !solid) continue;
+
+                int xDiff = Math.Abs(x - tileX);
+                int yDiff = Math.Abs(y - tileY);
+                if (xDiff <= 1 && yDiff <= 1) totalSurroundingTiles++;
 
                 Rectangle tileRect = new(x * 16, y * 16, 16, 16);
 
@@ -159,27 +169,34 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
                 if (velAlongNormal <= distToContact) continue;
 
                 float normalPenetration = velAlongNormal - Math.Max(0f, distToContact);
-                Position -= normalPenetration * normal;
 
-                Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
-                Grounded = true;
-                SplatNoise(velAlongNormal);
-                CollideDust(velAlongNormal, normal);
-                OnHitGround.Invoke(velAlongNormal);
+                ResolveCollision(normal, normalPenetration, tile);
                 break;
             }
 
             float penetration = Radius - dist;
-            Position -= penetration * normal;
-            Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
-            Grounded = true;
-            SplatNoise(velAlongNormal);
-            CollideDust(velAlongNormal, normal);
-            OnHitGround.Invoke(velAlongNormal);
+            ResolveCollision(normal, penetration, tile);
             break;
         }
+        suffocating = totalSurroundingTiles >= 4;
 
         return false;
+    }
+    private void ResolveCollision(Vector2 normal, float penetration, Rectangle rect)
+    {
+        float velAlongNormal = Vector2.Dot(Velocity, normal);
+        Position -= penetration * normal;
+        Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
+        Grounded = true;
+
+        tileX = rect.X / 16;
+        tileY = rect.Y / 16;
+        var tile = Main.tile[tileX, tileY];
+        touchingTileType = tile.HasTile ? tile.TileType : -1;
+
+        SplatNoise(velAlongNormal);
+        CollideDust(velAlongNormal, normal);
+        OnHitGround.Invoke(velAlongNormal);
     }
     private void SplatNoise(float magnitude)
     {   
@@ -212,8 +229,6 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
             if (Main.rand.NextBool(chanceForBlood) && chanceForBlood < 15)
                 Dust.NewDust(Position - new Vector2(Radius, Radius), (int)Radius * 2, (int)Radius * 2, DustID.Blood, normal.X * 0.4f, normal.Y * 0.4f, Scale: MathHelper.Clamp(magnitude / 10f, 0f, 2f));
         }
-        if (magnitude < 15f) return;
-        Main.instance.CameraModifiers.Add(new PunchCameraModifier(Position, Main.rand.NextVector2Circular(1f,1f), magnitude, 10f, (int)magnitude, 500f, "splatShake"));
     }
     private float GetDrag()
     {

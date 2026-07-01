@@ -18,7 +18,7 @@ namespace FishMode.Core;
 
 public class FishPlayer : ModPlayer
 {
-    public PlayerFishBody Body;
+    public PlayerFishBody? Body;
     private const int baseBodyLength = 5;
     private int _bodyLength = baseBodyLength;
     public int BodyLength
@@ -50,177 +50,6 @@ public class FishPlayer : ModPlayer
     private float waveAccel;
 
     private readonly List<PlayerParticle> testParticles = [];
-
-    #region edits
-    public override void Load()
-    {
-        On_Player.Teleport += (orig, self, pos, style, extraInfo) =>
-        {
-            orig(self, pos, style, extraInfo);
-            var body = self.GetModPlayer<FishPlayer>().Body;
-            body.Teleport(pos);
-            foreach(var p in body.particles)
-            {
-                p.Velocity = Vector2.Zero;
-            }
-        };
-        On_Player.HorizontalMovement += (orig, self) => { if (!disable) orig(self); };
-        On_Player.JumpMovement += (orig, self) => { if (!disable) orig(self); };
-        On_Player.CheckDrowning += DrownOverride;
-        IL_Player.Update_NPCCollision += NPCColliision;
-        IL_Projectile.HurtPlayer += ProjectileCollision;
-    }
-    private void ProjectileCollision(ILContext il)
-    {
-        var c = new ILCursor(il);
-
-        var loopIndexA = c.Body.Variables.Count;
-        il.Body.Variables.Add(new VariableDefinition(il.Import(typeof(int))));
-
-        c.GotoNext(i => i.MatchLdloc0());
-
-        var loopLabel = il.DefineLabel();
-        var endLoopLabel = il.DefineLabel();
-
-        c.EmitLdcI4(0);
-        c.EmitStloc(loopIndexA); //for loop index
-        c.EmitBr(endLoopLabel);
-
-        c.MarkLabel(loopLabel); //start of loop
-
-        c.GotoNext(i => i.MatchRet());
-        c.Remove();
-        c.EmitBr(endLoopLabel); //continue instead of return
-
-        c.GotoNext(i => i.MatchLdarga(1));
-        c.Index++;
-        c.RemoveRange(3);
-        c.EmitLdloc(0); //player
-        c.EmitLdloc(loopIndexA);
-        c.EmitDelegate((ref Rectangle hitbox, Player plr, int index) =>
-        {
-            var body = plr.GetModPlayer<FishPlayer>().Body;
-            var point = body.particles[index];
-            var pos = point.Position;
-            var radius = point.Radius;
-            Rectangle rect = new((int)(pos.X - radius), (int)(pos.Y - radius), (int)radius * 2, (int)radius * 2);
-            return rect.Intersects(hitbox);
-        });
-
-        c.GotoNext(i => i.MatchRet());
-        c.Remove();
-        c.EmitBr(endLoopLabel); //continue instead of return
-
-        c.Index = c.Instrs.Count - 1;
-
-        c.MarkLabel(endLoopLabel);
-
-        c.EmitLdloc(loopIndexA);
-        c.EmitLdcI4(1);
-        c.EmitAdd();
-        c.EmitStloc(loopIndexA);
-
-        c.EmitLdloc(loopIndexA);
-        c.EmitLdarg0();
-        c.EmitDelegate((Player self) => self.GetModPlayer<FishPlayer>().Body.particles.Count);
-        c.EmitBlt(loopLabel);
-    }
-    private void NPCColliision(ILContext il)
-    {
-        var c = new ILCursor(il);
-
-        var loopIndexA = c.Body.Variables.Count;
-        il.Body.Variables.Add(new VariableDefinition(il.Import(typeof(int)))); 
-
-        if (!c.TryGotoNext(i => i.MatchLdloca(0))) return;
-        c.RemoveRange(14);
-
-        var loopLabel = il.DefineLabel();
-        var endLoopLabel = il.DefineLabel();
-
-        c.EmitLdcI4(0);
-        c.EmitStloc(loopIndexA); //for loop index
-        c.EmitBr(endLoopLabel);
-
-        c.MarkLabel(loopLabel); //start of loop
-
-        c.EmitLdloca(0); //load rect address
-        c.EmitLdloc(loopIndexA); //load index
-        c.EmitLdarg0(); //load player instance
-        c.EmitDelegate((ref Rectangle rect, int index, Player self) =>
-        {
-            var body = self.GetModPlayer<FishPlayer>().Body;
-            var point = body.particles[index];
-            var pos = point.Position;
-            var radius = point.Radius;
-            rect = new((int)(pos.X - radius), (int)(pos.Y - radius), (int)radius * 2, (int)radius * 2);
-
-            //Dust.QuickBox(rect.TopLeft(), rect.BottomRight(), 0, Color.White, null);
-        });
-
-        c.GotoNext(i => i.MatchRet());
-
-        c.MarkLabel(endLoopLabel);
-
-        c.EmitLdloc(loopIndexA);
-        c.EmitLdcI4(1);
-        c.EmitAdd();
-        c.EmitStloc(loopIndexA);
-
-        c.EmitLdloc(loopIndexA);
-        c.EmitLdarg0();
-        c.EmitDelegate((Player self) => self.GetModPlayer<FishPlayer>().Body.particles.Count);
-        c.EmitBlt(loopLabel);
-    }
-    private void DrownOverride(On_Player.orig_CheckDrowning orig, Player self)
-    {
-        var body = self.GetModPlayer<FishPlayer>().Body;
-        bool shouldDrown = body.particles[0].GetLiquid() == -1; //in air
-        bool lungs = self.gills;
-
-        if (lungs && shouldDrown)
-            shouldDrown = false;
-        if (self.shimmering)
-            shouldDrown = false;
-
-        if (Main.myPlayer == self.whoAmI)
-        {
-            if (shouldDrown)
-            {
-                self.breathCD++;
-                if (self.breathCD >= self.breathCDMax)
-                {
-                    self.breathCD = 0;
-                    self.breath--;
-                    if (self.breath == 0)
-                    {
-                        SoundEngine.PlaySound(23);
-                    }
-                    if (self.breath <= 0)
-                    {
-                        self.lifeRegenTime = 0f;
-                        self.breath = 0;
-                        self.statLife -= 2;
-                        if (self.statLife <= 0)
-                        {
-                            self.statLife = 0;
-                            self.KillMe(PlayerDeathReason.ByOther(1), 10.0, 0);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                self.breath += 3;
-                if (self.breath > self.breathMax)
-                {
-                    self.breath = self.breathMax;
-                }
-                self.breathCD = 0;
-            }
-        }
-    }
-    #endregion
 
     public override void OnEnterWorld()
     {
@@ -267,6 +96,17 @@ public class FishPlayer : ModPlayer
         if (triggersSet.Jump && Body.Grounded)
         {
             Body.Jump(10f + Player.jumpSpeedBoost);
+        }
+
+        if (Keybinds.LockBind.JustReleased && MoveMode == FishModeConfig.MovementType.LookAndLock)
+        {
+            LockOnHelper.ForceUsability = true;
+            PlayerInput.Triggers.JustReleased.LockOn = true;
+            LockOnHelper.SetActive(true);
+        } else if (MoveMode == FishModeConfig.MovementType.WASD)
+        {
+            LockOnHelper.ForceUsability = false;
+            LockOnHelper.SetActive(false);
         }
     }
     public override void PreUpdateMovement()
@@ -357,6 +197,6 @@ public class FishPlayer : ModPlayer
         var scale = new Vector2(width / px.Width, length / px.Height);
         var og = px.Size() / 2f;
         var rot = averageDir + MathHelper.PiOver2;
-        Main.spriteBatch.Draw(px, (avgDirPos + center) / 2f - Main.screenPosition, null, Color.White, rot, og, scale, SpriteEffects.None, 0f);
+        Main.spriteBatch.Draw(px, (avgDirPos + center) / 2f - Main.screenPosition, null, Color.Red, rot, og, scale, SpriteEffects.None, 0f);
     }
 }

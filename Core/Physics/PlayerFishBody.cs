@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Terraria;
+using Terraria.DataStructures;
+using Terraria.Graphics.Renderers;
 using Terraria.ModLoader;
 
 namespace FishMode.Core.Physics;
@@ -17,16 +19,21 @@ public class PlayerFishBody
     public readonly List<PlayerParticle> particles = [];
     public bool Grounded => particles.Count(p => p.Grounded) > particles.Count / 2;
     public bool Submerged => particles.Count(p => p.GetLiquid() > -1) > particles.Count / 2;
+    private Player Player { get; set; }
+
+    private int timeInAir;
     public PlayerFishBody(Player player, int segments)
     {
+        Player = player;
         for (int i = 0; i < segments; i++)
         {
             float mass = i == 0 ? baseSegmentMass * 1.5f : baseSegmentMass;
             PlayerParticle particle = new(player.Bottom - Vector2.UnitY * i * SegmentLength, mass, Width / 2f);
             particles.Add(particle);
+            particle.OnHitGround += FallDamage;
         }
 
-        int iterations = (int)(segments * 2);
+        int iterations = (int)(segments * 1.5f);
 
         for(int i = 0; i < segments - 1; i++)
         {
@@ -62,11 +69,12 @@ public class PlayerFishBody
     }
     public void AddSegment()
     {
-        if (particles.Count >= 10) return;
+        if (particles.Count >= 50) return;
 
         var delta = particles[^1].Position - particles[^2].Position;
         PlayerParticle particle = new(particles[^1].Position + delta, baseSegmentMass, Width / 2f);
         particles.Add(particle);
+        particle.OnHitGround += FallDamage;
 
         int iterations = (int)(particles.Count * 2);
 
@@ -85,6 +93,7 @@ public class PlayerFishBody
         if (particles.Count <= 2) return;
         foreach (var particle in particles)
             particle.Constraints.RemoveAll(c => c.ParticleB == particles[^1]);
+        particles[^1].OnHitGround -= FallDamage;
         particles.RemoveAt(particles.Count - 1);
     }
     public void DebugGrab()
@@ -107,14 +116,30 @@ public class PlayerFishBody
             }
         }
     }
-    public void Propel(float speed, float falloff = 0.4f)
+    private void FallDamage(float magnitude)
     {
+        if (Player.noFallDmg || Submerged) return;
+        float thresh = 12f;
+        int mult = 7;
+        float timeMultiplier = 2f;
+        if (magnitude < thresh) return;
+        int dmg = (int)(magnitude - thresh) * mult + (int)(timeInAir * timeMultiplier - 100);
+        Player.Hurt(PlayerDeathReason.ByOther(0), dmg, 0);
+        timeInAir = 0;
+    }
+    public void Propel(float speed, float falloff = 0.4f, Vector2? direction = null)
+    {
+        direction ??= Main.MouseWorld;
         foreach (var particle in particles)
         {
-            float air = particle.GetLiquid() == 0 ? 1f : 0.8f;
-            var dir = particle.Position.DirectionTo(Main.MouseWorld).SafeNormalize(Vector2.Zero) * speed * air;
-            dir.Y *= air;
-            particle.AddForce(dir);
+            var dir = particle.Position.DirectionTo(direction.Value).SafeNormalize(Vector2.Zero);
+            float air = Submerged ? 1f : 0.7f;
+            var dot = (1 - Vector2.Dot(-Vector2.UnitY, dir)) * 0.5f;
+            dot *= 0.5f; dot += 0.5f;
+            if (!Submerged) air *= dot;
+            var vel = dir * speed * air;
+            vel.Y *= air;
+            particle.AddForce(vel);
             speed *= falloff; //all particles contribute but less
             particle.Frozen = false;
         }
@@ -122,10 +147,16 @@ public class PlayerFishBody
     public void Teleport(Vector2 pos)
     {
         Vector2 center = new(particles.Average(p => p.Position.X), particles.Average(p => p.Position.Y));
+        List<Vector2> offsets = [];
         foreach (var particle in particles)
         {
+            offsets.Add(particles[0].Position - particle.Position);
+        }
+        for (int i = 0; i < particles.Count; i++)
+        {
+            var particle = particles[i];
             particle.Frozen = false;
-            particle.Position = pos;
+            particle.Position = pos - offsets[i];
         }
     }
     public void Jump(float strength)
@@ -139,6 +170,7 @@ public class PlayerFishBody
     }
     public void Update()
     {
+        timeInAir = Grounded || particles[0].Velocity.Y < 0 ? 0 : timeInAir + 1;
         foreach (var particle in particles)
         {
             particle.Update();

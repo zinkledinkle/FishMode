@@ -6,15 +6,12 @@ using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using System;
 using System.Collections.Generic;
-using System.Data;
 using Terraria;
 using Terraria.Audio;
 using Terraria.DataStructures;
 using Terraria.GameContent;
 using Terraria.GameInput;
 using Terraria.Graphics;
-using Terraria.Graphics.Renderers;
-using Terraria.ID;
 using Terraria.ModLoader;
 
 namespace FishMode.Core;
@@ -30,6 +27,7 @@ public class FishPlayer : ModPlayer
 
         set => _bodyLength = MathHelper.Clamp(value, 2, 10);
     }
+    private static FishModeConfig.MovementType MoveMode => ModContent.GetInstance<FishModeConfig>().MovementMode;
 
     public bool lastF = false;
     public bool lastG = false;
@@ -37,14 +35,14 @@ public class FishPlayer : ModPlayer
     public bool freeze = false;
     public bool disable = false;
 
-    private int dashCooldown = 0;
-    private int dashTime = 0;
+    private int dashCooldown;
+    private int dashTime;
 
     public int dashCooldownTime;
     public int dashDuration;
     public float dashSpeed;
 
-    //wavey stuff
+    private int wasdSineTimer;
     private float averageDir;
     private int waveTimer;
     private int waveDecayTimer;
@@ -72,7 +70,6 @@ public class FishPlayer : ModPlayer
         IL_Player.Update_NPCCollision += NPCColliision;
         IL_Projectile.HurtPlayer += ProjectileCollision;
     }
-
     private void ProjectileCollision(ILContext il)
     {
         var c = new ILCursor(il);
@@ -232,10 +229,9 @@ public class FishPlayer : ModPlayer
     }
     public override void ResetEffects()
     {
-        Main.NewText(waveAccel);
-        Main.NewText(waveTimer);
-        Main.NewText(waveUp ? "up" : "down");
+        Main.SetCameraLerp(0.05f, 100);
         if (PlayerInput.GetPressedKeys().Contains(Keys.LeftControl) && Main.mouseRight && Main.mouseRightRelease) Body = new PlayerFishBody(Player, BodyLength);
+        if (!Player.controlJump) wasdSineTimer = 0; else wasdSineTimer++;
 
         dashCooldownTime = 120;
         dashDuration = 20;
@@ -268,63 +264,16 @@ public class FishPlayer : ModPlayer
         }
         lastG = G;
 
-        if (Keybinds.DashBind.JustPressed && dashCooldown == 0)
-        {
-            dashTime = dashDuration;
-            dashCooldown = dashCooldownTime + dashDuration;
-        }
         if (triggersSet.Jump && Body.Grounded)
         {
             Body.Jump(10f + Player.jumpSpeedBoost);
         }
-
-        //if (Main.mouseMiddle && Main.mouseMiddleRelease)
-        //{
-        //    var a = new PlayerParticle(Main.MouseWorld - Vector2.UnitX * 15, 3f, 15f);
-        //    var b = new PlayerParticle(Main.MouseWorld, 3f, 15f);
-        //    var c = new PlayerParticle(Main.MouseWorld + Vector2.UnitX * 15, 3f, 15f);
-
-        //    int i = 7;
-        //    float dist = 60f;
-        //    float strength = 0.1f;
-
-        //    a.AddConstraint(new DistanceConstraint(a, b, dist, strength, strength, i));
-        //    b.AddConstraint(new DistanceConstraint(b, c, dist, strength, strength, i));
-
-        //    b.AddConstraint(new DistanceConstraint(b, a, dist, strength, strength, i));
-        //    c.AddConstraint(new DistanceConstraint(c, b, dist, strength, strength, i));
-
-        //    //a.AddConstraint(new DistanceConstraint(a, c, dist * 2, 0f, strength, i));
-        //    //c.AddConstraint(new DistanceConstraint(c, a, dist * 2, 0f, strength, i));
-
-        //    testParticles.Add(a);
-        //    testParticles.Add(b);
-        //    testParticles.Add(c);
-        //}
-        //if (Main.mouseMiddle && Main.mouseLeft)
-        //{
-        //    testParticles.Clear();
-        //}
-
-        //foreach (var p in testParticles)
-        //{
-        //    if (triggersSet.Down || Main.mouseLeft && Main.mouseLeftRelease)
-        //    {
-        //        p.Update();
-        //        foreach(var c in p.Constraints)
-        //        {
-        //            c.Apply();
-        //        }
-        //        p.Step();
-        //    }
-        //}
     }
     public override void PreUpdateMovement()
     {
         if (freeze) return;
 
         Body.SetEnviromentalValues(gravity: Player.gravity * Player.gravDir);
-
         while (Body.particles.Count < BodyLength)
             Body.AddSegment();
         while (Body.particles.Count > BodyLength)
@@ -332,46 +281,58 @@ public class FishPlayer : ModPlayer
 
         Body.Update();
 
-        if (Player.controlUp)
+        float moveSpeed = 3f * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f);
+        if (MoveMode == FishModeConfig.MovementType.LookAndLock)
         {
-            Body.Propel(3f * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f), 0.3f);
+            if (Player.controlUp)
+            {
+                Body.Propel(moveSpeed, 0.3f);
+            }
+            var dir = Main.MouseWorld - Body.particles[0].Position;
+            if (Body.Submerged && Player.controlUp) WaveShit(dir);
         }
-        if (dashTime > 0)
+        else
         {
-            Body.Propel(dashSpeed, 0.8f);
-        }
+            var right = Player.controlRight.ToDirectionInt();
+            var left = Player.controlLeft.ToDirectionInt();
+            var down = Player.controlDown.ToDirectionInt();
+            var up = Player.controlUp.ToDirectionInt();
+            Vector2 input = new(right - left, down - up);
+            if (input == Vector2.Zero) return;
+            if (Body.Submerged)
+            {
+                var sine = MathF.Sin(wasdSineTimer / MathF.PI / 60f * 40f);
+                input = input.RotatedBy(sine * 0.4f);
+            }
 
-        if (Body.Submerged) WaveShit();
+            Body.Propel(moveSpeed, 0.3f, Body.particles[0].Position + input);
+            WaveShit(input);
+        }
     }
-    private void WaveShit()
+    private void WaveShit(Vector2 dir)
     {
-        var front = Body.particles[0].Position;
-        var delta = Main.MouseWorld - front;
-
-        var angleTo = MathF.Atan2(delta.Y, delta.X);
+        var angleTo = MathF.Atan2(dir.Y, dir.X);
         var angleDelta = MathHelper.WrapAngle(angleTo - averageDir);
         averageDir = MathHelper.WrapAngle(averageDir + angleDelta * 0.05f);
 
-        float threshold = 0.2f;
+        float threshold = 0.15f;
         float increment = 0.15f;
 
         if (waveTimer > 0) return;
 
         if (angleDelta > threshold && waveUp)
         {
-            waveTimer = 15;
+            waveTimer = 10;
             waveDecayTimer = 40;
             waveAccel = MathF.Min(waveAccel + increment, 1f);
             waveUp = false;
-            for (int i = 0; i < 10; i++) Dust.NewDust(front, 16, 16, DustID.AncientLight);
         }
         if (angleDelta < -threshold && !waveUp)
         {
-            waveTimer = 15;
+            waveTimer = 10;
             waveDecayTimer = 40;
             waveAccel = MathF.Min(waveAccel + increment, 1f);
             waveUp = true;
-            for (int i = 0; i < 10; i++) Dust.NewDust(front, 16, 16, DustID.AncientLight);
         }
     }
     public override void PostUpdate()

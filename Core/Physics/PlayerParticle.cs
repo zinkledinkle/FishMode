@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Terraria;
 using Terraria.Audio;
+using Terraria.Graphics.CameraModifiers;
 using Terraria.ID;
 
 namespace FishMode.Core.Physics;
@@ -27,7 +28,7 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     private static readonly SoundStyle SplatHard = new("FishMode/Assets/Sounds/SplatHard", 3, SoundType.Sound)
     {
         Volume = 0.8f,
-        MaxInstances = 0,
+        MaxInstances = 1,
         PitchVariance = 0.2f,
     };
     private int timeSinceLastSplat = 0;
@@ -42,6 +43,7 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     public bool Grabbed { get; set; } = false;
     public bool Grounded { get; set; } = false;
     public List<IConstraint> Constraints { get; set; } = [];
+    public event Action<float> OnHitGround = delegate { };
     public void AddConstraint(IConstraint constraint) => Constraints.Add(constraint);
     public void AddForce(Vector2 force) => Force += force / Mass;
 
@@ -56,7 +58,7 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     private float gravity = 0.5f;
 
     private const float maxXSpeed = 30f;
-    private const float maxYSpeed = 20f;
+    private const float maxYSpeed = 30f;
 
     public void SetEnviromentalValues(
         float airDrag = 0.01f,
@@ -162,6 +164,8 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
                 Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
                 Grounded = true;
                 SplatNoise(velAlongNormal);
+                CollideDust(velAlongNormal, normal);
+                OnHitGround.Invoke(velAlongNormal);
                 break;
             }
 
@@ -170,18 +174,20 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
             Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
             Grounded = true;
             SplatNoise(velAlongNormal);
+            CollideDust(velAlongNormal, normal);
+            OnHitGround.Invoke(velAlongNormal);
             break;
         }
 
         return false;
     }
     private void SplatNoise(float magnitude)
-    {
-        if (magnitude < 5f) return;
+    {   
+        if (magnitude < 6f) return;
         int strength = magnitude switch
         {
-            < 10f => 1,
-            < 20f => 2,
+            < 12f => 1,
+            < 22f => 2,
             _ => 3
         };
         int requiredCooldown = strength * 15;
@@ -193,6 +199,21 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
             _ => SplatHard
         };
         SoundEngine.PlaySound(sound, Position);
+    }
+    private void CollideDust(float magnitude, Vector2 normal)
+    {
+        int tries = (int)magnitude / 2;
+        int chanceForBlood = (30 - MathHelper.Clamp((int)magnitude, 0, 29));
+        normal = -normal.RotatedByRandom(0.6f) * Main.rand.NextFloat(0.5f,1.5f) * magnitude;
+        for (int i = 0; i < tries; i++)
+        {
+            if (Main.rand.NextBool(3)) 
+                Dust.NewDust(Position - new Vector2(Radius, Radius), (int)Radius * 2, (int)Radius * 2, DustID.Water, normal.X, normal.Y, Scale: MathHelper.Clamp(magnitude / 6f, 1f, 3f));
+            if (Main.rand.NextBool(chanceForBlood) && chanceForBlood < 15)
+                Dust.NewDust(Position - new Vector2(Radius, Radius), (int)Radius * 2, (int)Radius * 2, DustID.Blood, normal.X * 0.4f, normal.Y * 0.4f, Scale: MathHelper.Clamp(magnitude / 10f, 0f, 2f));
+        }
+        if (magnitude < 15f) return;
+        Main.instance.CameraModifiers.Add(new PunchCameraModifier(Position, Main.rand.NextVector2Circular(1f,1f), magnitude, 10f, (int)magnitude, 500f, "splatShake"));
     }
     private float GetDrag()
     {

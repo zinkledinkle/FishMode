@@ -2,31 +2,42 @@ Configs: {
 	FishModeConfig: {
 		DisplayName: Fish Mode Config
 
-		BodySegmentCount: {
-			Label: Body Segment Count
-			Tooltip: ""
-		}
-
 		BodyWidth: {
 			Label: Body Width
-			Tooltip: ""
-		}
-
-		BodyLength: {
-			Label: Body Length
-			Tooltip: ""
+			Tooltip: How wide the player's body is, in pixels
 		}
 
 		BaseSegmentLength: {
 			Label: Base Segment Length
-			Tooltip: ""
+			Tooltip: How long each individual player segment is, in pixels.
 		}
 
 		DebugDraw: {
 			Label: Debug Draw
 			Tooltip: ""
 		}
+
+		MovementMode: {
+			Label: Movement Mode
+			Tooltip: ""
+		}
+
+		Headers.experimental: experimental Header
+	}
+
+	MovementType: {
+		Tooltip: ""
+
+		LookAndLock: {
+			Label: Look-And-Lock
+			Tooltip: Uses {ForwardBind} to propel yourself where your mouse is pointing, and uses {LockBind} to lock onto enemies.
+		}
+
+		WASD: {
+			Label: WASD
+			Tooltip: Uses your main directional keys to move, uses your jump key to wave.
+		}
 	}
 }
 
-Keybinds.Dash.DisplayName: Dash
+Keybinds.LockOn.DisplayName: Lock On

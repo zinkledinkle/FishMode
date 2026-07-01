@@ -72,8 +72,9 @@ public class PlayerRenderTarget : ILoadable
         Vector2 off = new(GetIndexFromPlayer(drawPlayer.whoAmI) * frameWidth + frameWidth / 2f, frameHeight / 2f);
         drawPlayer.itemLocation = _itemPos;
         Main.screenPosition = Vector2.Zero;
+        var newPos = off - drawPlayer.Size / 2f;
 
-        orig(self, camera, drawPlayer, off - drawPlayer.Size / 2f, 0f, rotationOrigin, shadow, scale); //don't bother with rotation #lol!
+        orig(self, camera, drawPlayer, newPos, 0f, rotationOrigin, shadow, scale); //don't bother with rotation #lol!
 
         Main.screenPosition = _screenPos;
         drawPlayer.itemLocation = _itemPos;

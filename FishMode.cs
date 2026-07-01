@@ -10,7 +10,17 @@ public class FishMode : Mod
 }
 public class FishModeConfig : ModConfig
 {
-    public override ConfigScope Mode => ConfigScope.ServerSide;
+    public override ConfigScope Mode => ConfigScope.ClientSide;
+    public enum MovementType
+    {
+        LookAndLock,
+        WASD
+    }
+    [DefaultValue(MovementType.LookAndLock)]
+    public MovementType MovementMode {  get; set; }
+
+    [Header("experimental")]
+
     [DefaultValue(24f)]
     [Range(12f, 64f)]
     public int BodyWidth { get; set; }

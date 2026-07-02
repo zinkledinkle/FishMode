@@ -2,13 +2,9 @@ using FishMode.Core.Physics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using Mono.Cecil.Cil;
-using MonoMod.Cil;
 using System;
 using System.Collections.Generic;
 using Terraria;
-using Terraria.Audio;
-using Terraria.DataStructures;
 using Terraria.GameContent;
 using Terraria.GameInput;
 using Terraria.Graphics;
@@ -16,7 +12,7 @@ using Terraria.ModLoader;
 
 namespace FishMode.Core;
 
-public class FishPlayer : ModPlayer
+public partial class FishPlayer : ModPlayer
 {
     public PlayerFishBody? Body;
     private const int baseBodyLength = 5;
@@ -53,8 +49,17 @@ public class FishPlayer : ModPlayer
 
     public override void OnEnterWorld()
     {
-        Body = new PlayerFishBody(Player, BodyLength);
-        disable = true;
+        Body = new(Player, BodyLength);
+    }
+    public override void OnRespawn()
+    {
+        Vector2 spawn;
+        if (Player.SpawnX == -1)
+        {
+            spawn = new(Main.spawnTileX * 16 + 8, Main.spawnTileY * 16 + 8);
+        } else spawn = new(Player.SpawnX * 16 + 8, Player.SpawnY * 16 + 8);
+        Player.Center = spawn;
+        Body = new(Player, BodyLength);
     }
     public override void ResetEffects()
     {
@@ -76,8 +81,13 @@ public class FishPlayer : ModPlayer
         waveTimer = Math.Max(0, waveTimer - 1);
         if (waveDecayTimer == 0) waveAccel = MathF.Max(0f, waveAccel - 0.01f);
     }
+    public override void UpdateDead()
+    {
+        Body.Update();
+    }
     public override void ProcessTriggers(TriggersSet triggersSet)
     {
+        if (Player.dead) return;
         bool F = PlayerInput.GetPressedKeys().Contains(Keys.F);
         if (F && !lastF)
         {
@@ -177,7 +187,7 @@ public class FishPlayer : ModPlayer
     }
     public override void PostUpdate()
     {
-        if (disable) return;
+        if (disable || Player.dead) return;
 
         Vector2 fishPos = Body.particles[0].Position;
         Player.Center = fishPos;

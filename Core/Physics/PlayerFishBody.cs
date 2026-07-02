@@ -5,7 +5,6 @@ using System.Linq;
 using Terraria;
 using Terraria.DataStructures;
 using Terraria.Graphics.CameraModifiers;
-using Terraria.Graphics.Renderers;
 using Terraria.ModLoader;
 
 namespace FishMode.Core.Physics;
@@ -21,6 +20,7 @@ public class PlayerFishBody
     public bool Grounded => particles.Count(p => p.Grounded) > particles.Count / 2;
     public bool Submerged => particles.Count(p => p.GetLiquid() > -1) > particles.Count / 2;
     private Player Player { get; set; }
+    public bool dead = false;
 
     private int timeInAir;
     public PlayerFishBody(Player player, int segments)
@@ -29,7 +29,7 @@ public class PlayerFishBody
         for (int i = 0; i < segments; i++)
         {
             float mass = i == 0 ? baseSegmentMass * 1.5f : baseSegmentMass;
-            PlayerParticle particle = new(player.Bottom - Vector2.UnitY * i * SegmentLength, mass, Width / 2f);
+            PlayerParticle particle = new(player.Top + Vector2.UnitY * i * SegmentLength, mass, Width / 2f);
             particles.Add(particle);
             particle.OnHitGround += FallDamage;
         }
@@ -91,7 +91,7 @@ public class PlayerFishBody
     }
     public void RemoveSegment()
     {
-        if (particles.Count <= 2) return;
+        if (particles.Count <= 1) return;
         foreach (var particle in particles)
             particle.Constraints.RemoveAll(c => c.ParticleB == particles[^1]);
         particles[^1].OnHitGround -= FallDamage;
@@ -119,6 +119,7 @@ public class PlayerFishBody
     }
     private void FallDamage(float magnitude)
     {
+        if (dead) return;
         if (magnitude > 15f)
         {
             float strength = MathF.Min(magnitude + (timeInAir * 0.2f), 100f);
@@ -132,10 +133,26 @@ public class PlayerFishBody
         if (magnitude < thresh) return;
         int dmg = (int)(magnitude - thresh) * mult + (int)(timeInAir * timeMultiplier - 100);
         Player.Hurt(PlayerDeathReason.ByOther(0), dmg, 0);
+        if (Player.statLife <= 0)
+        {
+            Kill();
+        }
         timeInAir = 0;
+    }
+    private void Kill()
+    {
+        dead = true;
+        foreach (var particle in particles)
+        {
+            particle.Constraints.Clear(); //lol
+            particle.dead = true;
+            float speed = 15f;
+            particle.Force = Main.rand.NextVector2Circular(speed, speed);
+        }
     }
     public void Propel(float speed, float falloff = 0.4f, Vector2? direction = null)
     {
+        if (dead) return;
         direction ??= Main.MouseWorld;
         foreach (var particle in particles)
         {

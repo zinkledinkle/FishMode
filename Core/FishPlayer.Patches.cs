@@ -1,7 +1,6 @@
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
-using System;
 using Terraria;
 using Terraria.Audio;
 using Terraria.DataStructures;
@@ -10,9 +9,9 @@ using Terraria.ModLoader;
 
 namespace FishMode.Core;
 
-internal class PlayerPatches : ILoadable
+public partial class FishPlayer : ModPlayer
 {
-    public void Load(Mod mod)
+    public override void Load()
     {
         On_Player.Teleport += (orig, self, pos, style, extraInfo) =>
         {
@@ -32,7 +31,7 @@ internal class PlayerPatches : ILoadable
         IL_Player.Update_NPCCollision += NPCColliision;
         IL_Projectile.HurtPlayer += ProjectileCollision;
     }
-
+    #region IL
     private void SuffocateFix(ILContext il)
     {
         var c = new ILCursor(il);
@@ -181,6 +180,8 @@ internal class PlayerPatches : ILoadable
         c.EmitDelegate((Player self) => self.GetModPlayer<FishPlayer>().Body.particles.Count);
         c.EmitBlt(loopLabel);
     }
+    #endregion
+    #region Detours
     private void DrownOverride(On_Player.orig_CheckDrowning orig, Player self)
     {
         var body = self.GetModPlayer<FishPlayer>().Body;
@@ -229,6 +230,5 @@ internal class PlayerPatches : ILoadable
             }
         }
     }
-
-    public void Unload() { }
+    #endregion
 }

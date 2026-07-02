@@ -23,6 +23,11 @@ Configs: {
 		}
 
 		Headers.experimental: experimental Header
+
+		ScreenShake: {
+			Label: Screen Shake
+			Tooltip: ""
+		}
 	}
 
 	MovementType: {

@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Linq;
 using Terraria.ModLoader;
 using Terraria.ModLoader.Config;
 
@@ -17,8 +16,9 @@ public class FishModeConfig : ModConfig
         LookAndLock,
         WASD
     }
+    [Cycle]
     [DefaultValue(MovementType.LookAndLock)]
-    [TooltipArgs("FishMode/Keybinds/LockBind")]
+    [TooltipArgs()]
     public MovementType MovementMode {  get; set; }
     [DefaultValue(true)]
     public bool ScreenShake { get; set; }

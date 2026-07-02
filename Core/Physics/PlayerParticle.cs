@@ -65,6 +65,9 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     public int tileY = 0;
 
     public bool suffocating = false;
+    public float rotation = 0;
+    private float angleVel = 0;
+    public bool dead = false;
 
     public void SetEnviromentalValues(
         float airDrag = 0.01f,
@@ -86,6 +89,12 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
 
     public void Update()
     {
+        if (dead && Main.rand.NextBool(2))
+        {
+            Vector2 vel = Main.rand.NextVector2Circular(10f, 10f);
+            float scale = Main.rand.NextFloat(2f);
+            Dust.NewDust(Position, 1, 1, DustID.Blood, vel.X, vel.Y, Scale: scale);
+        }
         Grounded = false;
         suffocating = false;
         timeSinceLastSplat++;
@@ -101,6 +110,7 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
 
         float drag = GetDrag();
         Velocity -= Velocity * drag;
+        angleVel = Velocity.X / 15f; //only really for when DEAD
 
         TileCollide();
 
@@ -111,6 +121,7 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     {
         Velocity += Force;
         Position += Velocity;
+        rotation += angleVel;
 
         Force = Vector2.Zero;
     }
@@ -185,8 +196,13 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     private void ResolveCollision(Vector2 normal, float penetration, Rectangle rect)
     {
         float velAlongNormal = Vector2.Dot(Velocity, normal);
+
         Position -= penetration * normal;
-        Velocity = (Velocity - 2f * velAlongNormal * normal) * bounce;
+
+        float i = Mass * Radius * Radius / 2f;
+        float j = -2f * velAlongNormal;
+        Velocity += j * normal;
+        Velocity *= bounce;
         Grounded = true;
 
         tileX = rect.X / 16;

@@ -76,7 +76,8 @@ public class PlayerRenderTarget : ILoadable
         var _mountedCenter = drawPlayer.MountedCenter;
         var _pos = drawPlayer.position;
         var _heldProj = drawPlayer.heldProj;
-        var itemPos = drawPlayer.itemLocation;
+        var _itemPos = drawPlayer.itemLocation;
+        var _immuneAlpha = drawPlayer.immuneAlpha;
 
         Vector2 off = new(GetIndexFromPlayer(drawPlayer.whoAmI) * frameWidth + frameWidth / 2f, frameHeight / 2f);
         Main.screenPosition = Vector2.Zero;
@@ -99,9 +100,10 @@ public class PlayerRenderTarget : ILoadable
 
         Main.screenPosition = _screenPos;
         drawPlayer.heldProj = _heldProj;
-        drawPlayer.itemLocation = itemPos;
+        drawPlayer.itemLocation = _itemPos;
         drawPlayer.Center = _center;
         drawPlayer.MountedCenter = _mountedCenter;
+        drawPlayer.immuneAlpha = _immuneAlpha;
 
         gd.SetRenderTargets(prev);
 
@@ -120,19 +122,16 @@ public class PlayerRenderTarget : ILoadable
             orig(self, camera, drawPlayer, position, rotation, rotationOrigin, shadow, scale);
         } if (drawPlayer.itemAnimation > 0)
         {
-            curDrawSet.ItemLocation = itemPos;
+            curDrawSet.ItemLocation = _itemPos;
             int count = curDrawSet.DrawDataCache.Count;
             PlayerDrawLayers.DrawPlayer_27_HeldItem(ref curDrawSet); //draw the item later
             if (curDrawSet.DrawDataCache.Count == count) return; //nothing got added
             var draw = curDrawSet.DrawDataCache[^1];
-            draw.color = Lighting.GetColor((int)itemPos.X / 16, (int)itemPos.Y / 16);
+            draw.color = Lighting.GetColor((int)_itemPos.X / 16, (int)_itemPos.Y / 16);
             Main.spriteBatch.End();
             Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
             draw.Draw(Main.spriteBatch);
         }
-        Main.spriteBatch.End();
-        Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
-        Main.spriteBatch.Draw(Target, Vector2.Zero, GetPlayerSource(drawPlayer.whoAmI), Color.White);
     }
 
     public void Unload()

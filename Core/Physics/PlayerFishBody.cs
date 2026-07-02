@@ -139,14 +139,14 @@ public class PlayerFishBody
         }
         timeInAir = 0;
     }
-    private void Kill()
+    public void Kill()
     {
         dead = true;
         foreach (var particle in particles)
         {
             particle.Constraints.Clear(); //lol
             particle.dead = true;
-            float speed = 15f;
+            float speed = 20f;
             particle.Force = Main.rand.NextVector2Circular(speed, speed);
         }
     }

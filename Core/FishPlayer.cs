@@ -56,8 +56,8 @@ public partial class FishPlayer : ModPlayer
         Vector2 spawn;
         if (Player.SpawnX == -1)
         {
-            spawn = new(Main.spawnTileX * 16 + 8, Main.spawnTileY * 16 + 8);
-        } else spawn = new(Player.SpawnX * 16 + 8, Player.SpawnY * 16 + 8);
+            spawn = new(Main.spawnTileX * 16 + 8, Main.spawnTileY * 16 - 24);
+        } else spawn = new(Player.SpawnX * 16 + 8, Player.SpawnY * 16 - 24);
         Player.Center = spawn;
         Body = new(Player, BodyLength);
     }
@@ -83,6 +83,7 @@ public partial class FishPlayer : ModPlayer
     }
     public override void UpdateDead()
     {
+        if (!Body.dead) Body.Kill();
         Body.Update();
     }
     public override void ProcessTriggers(TriggersSet triggersSet)

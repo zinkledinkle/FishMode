@@ -1,9 +1,11 @@
 <Project Sdk="Tomat.Terraria.ModLoader.Sdk/2.1.0">
-	<Import Project="..\tModLoader.targets" />
+
 	<ItemGroup>
 		<Publicize Include="tModLoader;ReLogic;FNA" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
 	</ItemGroup>
+	
 	<ItemGroup>
 	  <Folder Include="Assets\Sounds\" />
 	</ItemGroup>
+	
 </Project>

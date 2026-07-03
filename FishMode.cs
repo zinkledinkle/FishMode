@@ -23,7 +23,7 @@ public class FishModeConfig : ModConfig
     [DefaultValue(true)]
     public bool ScreenShake { get; set; }
 
-    [Header("experimental")]
+    [Header("Experimental")]
 
     [DefaultValue(24f)]
     [Range(12f, 64f)]

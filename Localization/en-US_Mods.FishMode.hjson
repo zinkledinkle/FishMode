@@ -22,7 +22,10 @@ Configs: {
 			Tooltip: ""
 		}
 
-		Headers.experimental: experimental Header
+		Headers: {
+			experimental: experimental Header
+			Experimental: Experimental Header
+		}
 
 		ScreenShake: {
 			Label: Screen Shake

@@ -1,10 +1,8 @@
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terraria;
 using Terraria.Audio;
-using Terraria.Graphics.CameraModifiers;
 using Terraria.ID;
 
 namespace FishMode.Core.Physics;
@@ -42,8 +40,8 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     public bool Frozen { get; set; } = false;
     public bool Grabbed { get; set; } = false;
     public bool Grounded { get; set; } = false;
+    public float Restitution { get; set; } = 0.3f;
     public List<IConstraint> Constraints { get; set; } = [];
-    public event Action<float> OnHitGround = delegate { };
     public void AddConstraint(IConstraint constraint) => Constraints.Add(constraint);
     public void AddForce(Vector2 force) => Force += force / Mass;
 
@@ -52,8 +50,6 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     private float lavaDrag = 0.1f;
     private float honeyDrag = 0.2f;
     private float shimmerDrag = 0f;
-
-    private float bounce = 0.3f;
 
     private float gravity = 0.5f;
 
@@ -83,12 +79,22 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
         this.lavaDrag = lavaDrag;
         this.honeyDrag = honeyDrag;
         this.shimmerDrag = shimmerDrag;
-        this.bounce = bounce;
+        this.Restitution = bounce;
         this.gravity = gravity;
     }
-
+    public void ApplyEnviromentalForces()
+    {
+        if (GetLiquid() == -1)
+        {
+            Force += Vector2.UnitY * gravity;
+        }
+        float drag = GetDrag();
+        Velocity -= Velocity * drag;
+        angleVel = Velocity.X / 15f; //only really for when DEAD
+    }
     public void Update()
     {
+        Force = Vector2.Zero;
         if (dead && Main.rand.NextBool(2))
         {
             Vector2 vel = Main.rand.NextVector2Circular(10f, 10f);
@@ -103,17 +109,6 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
 
         if (Frozen) return;
 
-        if (GetLiquid() == -1)
-        {
-            Force += Vector2.UnitY * gravity;
-        }
-
-        float drag = GetDrag();
-        Velocity -= Velocity * drag;
-        angleVel = Velocity.X / 15f; //only really for when DEAD
-
-        TileCollide();
-
         if (Math.Abs(Velocity.X) > maxXSpeed) Velocity = new(Math.Sign(Velocity.X) * maxXSpeed, Velocity.Y);
         if (Math.Abs(Velocity.Y) > maxYSpeed) Velocity = new(Velocity.X, Math.Sign(Velocity.Y) * maxYSpeed);
     }
@@ -122,97 +117,16 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
         Velocity += Force;
         Position += Velocity;
         rotation += angleVel;
-
-        Force = Vector2.Zero;
     }
-    private static Vector2 ClosestPointOnRect(Vector2 p, Rectangle rect) => 
-        new(
-            Math.Clamp(p.X, rect.Left, rect.Right),
-            Math.Clamp(p.Y, rect.Top, rect.Bottom)
-        ); //closestpointinrect doesn't work because it just uses the actual sides
-
-    public bool TileCollide()
+    public void OnHitGround(float magnitude, Vector2 normal, int surroundingSolidTiles, int tileType, int tileX, int tileY)
     {
-        int tileX = (int)(Position.X / 16f);
-        int tileY = (int)(Position.Y / 16f);
-
-        int padding = (int)(Radius / 8f) + 1;
-
-        int addX = Math.Sign(Velocity.X);
-        int addY = Math.Sign(Velocity.Y);
-        int totalSurroundingTiles = 0;
-
-        List<Rectangle> candidates = [];
-
-        for (int x = tileX - padding + addX; x <= tileX + padding + addX; x++)
-        {
-            for (int y = tileY - padding + addY; y <= tileY + padding + addY; y++)
-            {
-                Tile tile = Main.tile[x, y];
-                bool solid = Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType];
-                if (!tile.HasTile || !solid) continue;
-
-                int xDiff = Math.Abs(x - tileX);
-                int yDiff = Math.Abs(y - tileY);
-                if (xDiff <= 1 && yDiff <= 1) totalSurroundingTiles++;
-
-                Rectangle tileRect = new(x * 16, y * 16, 16, 16);
-
-                candidates.Add(tileRect);
-            }
-        }
-
-        foreach (var tile in candidates.OrderBy(t => ClosestPointOnRect(Position, t).DistanceSQ(Position)))
-        {
-            Vector2 closestPoint = ClosestPointOnRect(Position, tile);
-            Vector2 delta = (closestPoint - Position);
-            float dist = delta.Length();
-
-            Vector2 normal = delta.SafeNormalize(Vector2.Zero);
-            float velAlongNormal = Vector2.Dot(Velocity, normal);
-
-            if (dist > Radius)
-            {
-                //check if it'll intersect NEXT frame
-                float velMagnitude = Velocity.Length();
-                float distToContact = dist - Radius;
-
-                if (velAlongNormal <= distToContact) continue;
-
-                float normalPenetration = velAlongNormal - Math.Max(0f, distToContact);
-
-                ResolveCollision(normal, normalPenetration, tile);
-                break;
-            }
-
-            float penetration = Radius - dist;
-            ResolveCollision(normal, penetration, tile);
-            break;
-        }
-        suffocating = totalSurroundingTiles >= 4;
-
-        return false;
-    }
-    private void ResolveCollision(Vector2 normal, float penetration, Rectangle rect)
-    {
-        float velAlongNormal = Vector2.Dot(Velocity, normal);
-
-        Position -= penetration * normal;
-
-        float i = Mass * Radius * Radius / 2f;
-        float j = -2f * velAlongNormal;
-        Velocity += j * normal;
-        Velocity *= bounce;
         Grounded = true;
-
-        tileX = rect.X / 16;
-        tileY = rect.Y / 16;
-        var tile = Main.tile[tileX, tileY];
-        touchingTileType = tile.HasTile ? tile.TileType : -1;
-
-        SplatNoise(velAlongNormal);
-        CollideDust(velAlongNormal, normal);
-        OnHitGround.Invoke(velAlongNormal);
+        SplatNoise(magnitude);
+        CollideDust(magnitude, normal);
+        suffocating = surroundingSolidTiles >= 4;
+        touchingTileType = tileType;
+        this.tileX = tileX;
+        this.tileY = tileY;
     }
     private void SplatNoise(float magnitude)
     {   

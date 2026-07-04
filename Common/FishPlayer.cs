@@ -3,7 +3,6 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
-using System.Collections.Generic;
 using Terraria;
 using Terraria.GameContent;
 using Terraria.GameInput;
@@ -16,12 +15,9 @@ public partial class FishPlayer : ModPlayer
 {
     public PlayerFishBody? Body;
     private const int baseBodyLength = 5;
-    private int _bodyLength = baseBodyLength;
     public int BodyLength
     {
-        get => _bodyLength;
-
-        set => _bodyLength = MathHelper.Clamp(value, 2, 10);
+        get; set => field = MathHelper.Clamp(value, 2, 50);
     }
     private static FishModeConfig.MovementType MoveMode => ModContent.GetInstance<FishModeConfig>().MovementMode;
 
@@ -44,8 +40,6 @@ public partial class FishPlayer : ModPlayer
     private int waveDecayTimer;
     private bool waveUp;
     private float waveAccel;
-
-    private readonly List<PlayerParticle> testParticles = [];
 
     public override void OnEnterWorld()
     {
@@ -72,7 +66,7 @@ public partial class FishPlayer : ModPlayer
         dashSpeed = 3f;
         BodyLength = baseBodyLength;
 
-        Body?.SetEnviromentalValues(); //reset to defaults
+        Body?.SetEnviromentalValues(bounce: 1f); //reset to defaults
 
         dashCooldown = Math.Max(0, dashCooldown - 1);
         dashTime = Math.Max(0, dashTime - 1);
@@ -106,7 +100,7 @@ public partial class FishPlayer : ModPlayer
 
         if (triggersSet.Jump && Body.Grounded)
         {
-            Body.Jump(10f + Player.jumpSpeedBoost);
+            Body.Jump((10f + Player.jumpSpeedBoost) * 3f);
         }
 
         if (Keybinds.LockBind.JustReleased && MoveMode == FishModeConfig.MovementType.LookAndLock)
@@ -132,12 +126,13 @@ public partial class FishPlayer : ModPlayer
 
         Body.Update();
 
-        float moveSpeed = 3f * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f);
+        float countModifier = MathF.Pow(Body.particles.Count, 1.3f) * 0.5f;
+        float moveSpeed = (1f + countModifier) * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f);
         if (MoveMode == FishModeConfig.MovementType.LookAndLock)
         {
             if (Player.controlUp)
             {
-                Body.Propel(moveSpeed, 0.3f);
+                Body.Propel(moveSpeed, Main.MouseWorld, 0.3f);
             }
             var dir = Main.MouseWorld - Body.particles[0].Position;
             if (Body.Submerged && Player.controlUp) WaveShit(dir);
@@ -156,7 +151,7 @@ public partial class FishPlayer : ModPlayer
                 input = input.RotatedBy(sine * 0.4f);
             }
 
-            Body.Propel(moveSpeed, 0.3f, Body.particles[0].Position + input);
+            Body.Propel(moveSpeed, Body.particles[0].Position + input, 0.3f);
             WaveShit(input);
         }
     }

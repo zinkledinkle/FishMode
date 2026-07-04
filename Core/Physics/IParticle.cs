@@ -14,6 +14,7 @@ public interface IParticle
     public float Restitution { get; set; }
     public List<IConstraint> Constraints { get; set; }
     public void Update();
+    public void AddConstraint(IConstraint constraint) => Constraints.Add(constraint);
     public void SolveConstraints()
     {
         foreach (var constraint in Constraints)

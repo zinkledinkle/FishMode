@@ -1,9 +1,13 @@
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
+using System;
+using System.Linq;
 using Terraria;
 using Terraria.Audio;
 using Terraria.DataStructures;
+using Terraria.GameContent;
+using Terraria.GameInput;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -23,13 +27,50 @@ public partial class FishPlayer : ModPlayer
                 p.Velocity = Vector2.Zero;
             }
         };
-        On_Player.HorizontalMovement += (orig, self) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self); };
-        On_Player.JumpMovement += (orig, self) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self); };
+        On_Player.HorizontalMovement += static (orig, self) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self); };
+        On_Player.JumpMovement += static (orig, self) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self); };
+        On_Player.DryCollision += (orig, self, fallthrough, ignorePlats) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self, fallthrough, ignorePlats); };
         On_Player.CheckDrowning += DrownOverride;
+
+        IL_DoorOpeningHelper.GetPlayerInfoForOpeningDoor += (il) =>
+        {
+            var c = new ILCursor(il);
+            c.GotoNext(i => i.MatchRet());
+            c.Index--;
+            c.EmitLdloca(10);
+            c.EmitLdarg1();
+            c.EmitDelegate((ref DoorOpeningHelper.PlayerInfoForOpeningDoors info, Player player) =>
+            {
+                info.hitboxToOpenDoor = PlayerRect(player);
+            });
+        };
+        IL_DoorOpeningHelper.GetPlayerInfoForClosingDoor += (il) =>
+        {
+            var c = new ILCursor(il);
+            c.GotoNext(i => i.MatchRet());
+            c.Index--;
+            c.EmitLdloca(0);
+            c.EmitLdarg1();
+            c.EmitDelegate((ref DoorOpeningHelper.PlayerInfoForClosingDoors info, Player player) =>
+            {
+                info.hitboxToNotCloseDoor = PlayerRect(player);
+            });
+        };
         IL_Player.Update += UpdateStuff;
         IL_Player.ApplyTouchDamage += SuffocateFix;
         IL_Player.Update_NPCCollision += NPCColliision;
+        IL_Player.ItemCheck_ApplyUseStyle_Inner += UsestyleFix;
         IL_Projectile.HurtPlayer += ProjectileCollision;
+    }
+
+    private static Rectangle PlayerRect(Player player)
+    {
+        var body = player.GetModPlayer<FishPlayer>().Body;
+        int x = (int)body.particles.Min(p => p.Position.X) - (int)body.particles[0].Radius;
+        int x2 = (int)body.particles.Max(p => p.Position.X) + (int)body.particles[0].Radius;
+        int y = (int)body.particles.Min(p => p.Position.Y) - (int)body.particles[0].Radius;
+        int y2 = (int)body.particles.Max(p => p.Position.Y) + (int)body.particles[0].Radius;
+        return new Rectangle(x, y, x2 - x, y2 - y);
     }
     #region IL
     private void SuffocateFix(ILContext il)
@@ -76,6 +117,44 @@ public partial class FishPlayer : ModPlayer
                 if (!particle.Grounded) continue;
                 self.ApplyTouchDamage(particle.touchingTileType, particle.tileX, particle.tileY);
             }
+        });
+    }
+    private void UsestyleFix(ILContext il)
+    {
+        var c = new ILCursor(il);
+
+        var skipVanillaSwingLabel = c.DefineLabel();
+
+        c.GotoNext(i => i.MatchLdcI4(1)); //itemusestyleid.swing
+        c.Index += 2;
+        c.EmitBr(skipVanillaSwingLabel);
+        c.GotoNext(i => i.MatchLdcI4(7)); //itemusestyleid.drinkold
+
+        c.Index -= 3;
+        c.MarkLabel(skipVanillaSwingLabel);
+
+        c.EmitLdarg0(); //player
+        c.EmitLdarg3(); //frame
+        c.EmitDelegate((Player self, Rectangle frame) =>
+        {
+            float arc = MathHelper.Pi;
+            var body = self.GetModPlayer<FishPlayer>().Body;
+            Vector2 pos = body.particles[0].Position;
+            Vector2 lookDir;
+            if (LockOnHelper.AimedTarget != null && LockOnHelper.AimedTarget.active)
+                lookDir = pos.DirectionTo(LockOnHelper.AimedTarget.Center);
+            else lookDir = pos.DirectionTo(Main.MouseWorld);
+
+            float rot = lookDir.ToRotation();
+            rot += MathHelper.PiOver2 * self.direction;
+            rot += arc / 2f;
+            float itemAnim = self.itemAnimation;
+            float p = MathF.Pow((itemAnim / (float)self.itemAnimationMax), 1.4f);
+            rot += p * arc * -self.direction;
+            int itemLength = frame.Height;
+            pos += new Vector2(0, -itemLength * 0.5f).RotatedBy(rot);
+            self.itemLocation = pos;// + frame.Size() / 2f;
+            self.itemRotation = rot - MathHelper.PiOver4 * self.direction;
         });
     }
     private void ProjectileCollision(ILContext il)
@@ -182,7 +261,7 @@ public partial class FishPlayer : ModPlayer
     }
     #endregion
     #region Detours
-    private void DrownOverride(On_Player.orig_CheckDrowning orig, Player self)
+    private static void DrownOverride(On_Player.orig_CheckDrowning orig, Player self)
     {
         var body = self.GetModPlayer<FishPlayer>().Body;
         bool shouldDrown = body.particles[0].GetLiquid() == -1; //in air

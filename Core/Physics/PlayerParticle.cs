@@ -7,7 +7,7 @@ using Terraria.ID;
 
 namespace FishMode.Core.Physics;
 
-public class PlayerParticle(Vector2 position, float mass, float radius) : IParticle
+public class EntityParticle(Vector2 position, float mass, float radius) : IParticle
 {
 #nullable enable
     #region sounds
@@ -38,7 +38,6 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
     public float Mass { get; set; } = mass;
     public float Radius { get; set; } = radius;
     public bool Frozen { get; set; } = false;
-    public bool Grabbed { get; set; } = false;
     public bool Grounded { get; set; } = false;
     public float Restitution { get; set; } = 0.3f;
     public List<IConstraint> Constraints { get; set; } = [];
@@ -90,7 +89,7 @@ public class PlayerParticle(Vector2 position, float mass, float radius) : IParti
         }
         float drag = GetDrag();
         Velocity -= Velocity * drag;
-        angleVel = Velocity.X / 15f; //only really for when DEAD
+        angleVel = Velocity.X / 15f; //ded
     }
     public void Update()
     {

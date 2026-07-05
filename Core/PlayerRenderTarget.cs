@@ -8,6 +8,7 @@ using Terraria.DataStructures;
 using MonoMod.Cil;
 using System.Reflection;
 using System;
+using FishMode.Common;
 
 namespace FishMode.Core;
 

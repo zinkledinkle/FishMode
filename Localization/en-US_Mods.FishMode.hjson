@@ -19,13 +19,10 @@ Configs: {
 
 		MovementMode: {
 			Label: Movement Mode
-			Tooltip: ""
+			Tooltip: Changes how the core movement works
 		}
 
-		Headers: {
-			experimental: experimental Header
-			Experimental: Experimental Header
-		}
+		Headers.Experimental: Experimental
 
 		ScreenShake: {
 			Label: Screen Shake
@@ -38,7 +35,7 @@ Configs: {
 
 		LookAndLock: {
 			Label: Look-And-Lock
-			Tooltip: Uses {ForwardBind} to propel yourself where your mouse is pointing, and uses {LockBind} to lock onto enemies.
+			Tooltip: Uses {UpBind} to propel yourself where your mouse is pointing, and uses {LockBind} to lock onto enemies.
 		}
 
 		WASD: {
@@ -48,4 +45,18 @@ Configs: {
 	}
 }
 
-Keybinds.LockOn.DisplayName: Lock On
+Krills: {
+	Bioluminescence1.DisplayName: Bioluminescence I
+	Swordfish.DisplayName: Swordfish
+	Waves.DisplayName: Waves
+}
+
+Keybinds: {
+	LockOn.DisplayName: Lock On
+	Skill1.DisplayName: Skill1
+	Skill2.DisplayName: Skill2
+	Skill3.DisplayName: Skill3
+	Skill4.DisplayName: Skill4
+	Skill5.DisplayName: Skill5
+	OpenKrillTree.DisplayName: Open Krill Tree
+}

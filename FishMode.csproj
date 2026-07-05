@@ -3,9 +3,13 @@
 	<ItemGroup>
 		<Publicize Include="tModLoader;ReLogic;FNA" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
 	</ItemGroup>
-	
+
 	<ItemGroup>
-	  <Folder Include="Assets\Sounds\" />
+	  <AdditionalFiles Remove="Assets\Textures\bubl.png" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Resource Include="Assets\Textures\bubl.png" />
 	</ItemGroup>
 	
 </Project>

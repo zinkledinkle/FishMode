@@ -1,4 +1,4 @@
-using FishMode.Core.Physics;
+using FishMode.UI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -9,7 +9,7 @@ using Terraria.GameInput;
 using Terraria.Graphics;
 using Terraria.ModLoader;
 
-namespace FishMode.Core;
+namespace FishMode.Common;
 
 public partial class FishPlayer : ModPlayer
 {
@@ -34,6 +34,7 @@ public partial class FishPlayer : ModPlayer
     public int dashDuration;
     public float dashSpeed;
 
+    public bool hasWave = false;
     private int wasdSineTimer;
     private float averageDir;
     private int waveTimer;
@@ -61,6 +62,8 @@ public partial class FishPlayer : ModPlayer
         if (PlayerInput.GetPressedKeys().Contains(Keys.LeftControl) && Main.mouseRight && Main.mouseRightRelease) Body = new PlayerFishBody(Player, BodyLength);
         if (!Player.controlJump) wasdSineTimer = 0; else wasdSineTimer++;
 
+        Player.GetModPlayer<KrillTreePlayer>().KrillPoints = 10;
+
         dashCooldownTime = 120;
         dashDuration = 20;
         dashSpeed = 3f;
@@ -70,6 +73,8 @@ public partial class FishPlayer : ModPlayer
 
         dashCooldown = Math.Max(0, dashCooldown - 1);
         dashTime = Math.Max(0, dashTime - 1);
+
+        hasWave = false;
 
         waveDecayTimer = Math.Max(0, waveDecayTimer - 1);
         waveTimer = Math.Max(0, waveTimer - 1);
@@ -83,6 +88,7 @@ public partial class FishPlayer : ModPlayer
     public override void ProcessTriggers(TriggersSet triggersSet)
     {
         if (Player.dead) return;
+
         bool F = PlayerInput.GetPressedKeys().Contains(Keys.F);
         if (F && !lastF)
         {
@@ -157,6 +163,7 @@ public partial class FishPlayer : ModPlayer
     }
     private void WaveShit(Vector2 dir)
     {
+        if (!hasWave) return;
         var angleTo = MathF.Atan2(dir.Y, dir.X);
         var angleDelta = MathHelper.WrapAngle(angleTo - averageDir);
         averageDir = MathHelper.WrapAngle(averageDir + angleDelta * 0.05f);

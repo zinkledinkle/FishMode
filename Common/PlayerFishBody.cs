@@ -1,3 +1,4 @@
+using FishMode.Core.Physics;
 using Microsoft.Xna.Framework;
 using System;
 using Terraria;
@@ -5,7 +6,7 @@ using Terraria.DataStructures;
 using Terraria.Graphics.CameraModifiers;
 using Terraria.ModLoader;
 
-namespace FishMode.Core.Physics;
+namespace FishMode.Common;
 
 public class PlayerFishBody : FishBody
 {

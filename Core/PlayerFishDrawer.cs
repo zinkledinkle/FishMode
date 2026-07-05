@@ -1,3 +1,4 @@
+using FishMode.Common;
 using FishMode.Core.Physics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;

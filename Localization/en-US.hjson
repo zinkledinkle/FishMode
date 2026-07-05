@@ -1,2 +1,6 @@
 ItemName.GillsPotion: Lungs Potion
-ItemTooltip.GillsPotion: Allows you to breathe air
+
+ItemTooltip: {
+	GillsPotion: Allows you to breathe air
+	IceSkates: Does absolutely nothing
+}

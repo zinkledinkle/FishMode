@@ -11,25 +11,27 @@ using Terraria.GameInput;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace FishMode.Core;
+namespace FishMode.Common;
 
 public partial class FishPlayer : ModPlayer
 {
+    private float startSwingRot = 0f;
     public override void Load()
     {
         On_Player.Teleport += (orig, self, pos, style, extraInfo) =>
         {
             orig(self, pos, style, extraInfo);
             var body = self.GetModPlayer<FishPlayer>().Body;
+            if (body == null) return;
             body.Teleport(pos);
             foreach (var p in body.particles)
             {
                 p.Velocity = Vector2.Zero;
             }
         };
-        On_Player.HorizontalMovement += static (orig, self) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self); };
-        On_Player.JumpMovement += static (orig, self) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self); };
-        On_Player.DryCollision += (orig, self, fallthrough, ignorePlats) => { if (!self.GetModPlayer<FishPlayer>().disable) orig(self, fallthrough, ignorePlats); };
+        On_Player.HorizontalMovement += static (orig, self) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self); };
+        On_Player.JumpMovement += static (orig, self) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self); };
+        On_Player.DryCollision += (orig, self, fallthrough, ignorePlats) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self, fallthrough, ignorePlats); };
         On_Player.CheckDrowning += DrownOverride;
 
         IL_DoorOpeningHelper.GetPlayerInfoForOpeningDoor += (il) =>
@@ -145,11 +147,16 @@ public partial class FishPlayer : ModPlayer
                 lookDir = pos.DirectionTo(LockOnHelper.AimedTarget.Center);
             else lookDir = pos.DirectionTo(Main.MouseWorld);
 
-            float rot = lookDir.ToRotation();
-            rot += MathHelper.PiOver2 * self.direction;
-            rot += arc / 2f;
             float itemAnim = self.itemAnimation;
             float p = MathF.Pow((itemAnim / (float)self.itemAnimationMax), 1.4f);
+            if (p == 1) 
+                self.GetModPlayer<FishPlayer>().startSwingRot = lookDir.ToRotation();
+            var startRot = self.GetModPlayer<FishPlayer>().startSwingRot;
+            self.direction = MathHelper.WrapAngle(startRot + MathHelper.PiOver2) > 0 ? 1 : -1;
+
+            float rot = self.GetModPlayer<FishPlayer>().startSwingRot; 
+            rot += MathHelper.PiOver2 * self.direction;
+            rot += arc / 2f;
             rot += p * arc * -self.direction;
             int itemLength = frame.Height;
             pos += new Vector2(0, -itemLength * 0.5f).RotatedBy(rot);

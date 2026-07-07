@@ -46,9 +46,35 @@ Configs: {
 }
 
 Krills: {
-	Bioluminescence1.DisplayName: Bioluminescence I
-	Swordfish.DisplayName: Swordfish
-	Waves.DisplayName: Waves
+	Bioluminescence1: {
+		DisplayName: Bioluminescence I
+		Tooltip: Makes you emit light
+	}
+
+	Swordfish: {
+		DisplayName: Swordfish
+		Tooltip: Deals higher melee damage at faster speeds, up to 15%
+	}
+
+	Waves: {
+		DisplayName: Waves
+		Tooltip: Moving in a wave pattern makes you go faster
+	}
+
+	Slither: {
+		DisplayName: Slither
+		Tooltip: +1 Length (longer fish have higher speeds but bigger hitboxes)
+	}
+
+	Hydrodynamics1: {
+		DisplayName: Hydrodynamics I
+		Tooltip: Speeds up movement in viscous liquid by 40%
+	}
+
+	ArmoredScales1: {
+		DisplayName: Armored Scales I
+		Tooltip: +10% Damage Reduction
+	}
 }
 
 Keybinds: {

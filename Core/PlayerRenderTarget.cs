@@ -15,8 +15,8 @@ namespace FishMode.Core;
 public class PlayerRenderTarget : ILoadable
 {
     public static RenderTarget2D Target { get; private set; }
-    public static int frameWidth = 200;
-    public static int frameHeight = 300;
+    public const int frameWidth = 200;
+    public const int frameHeight = 300;
     private static bool targetInUse = false;
 
     private static PlayerDrawSet curDrawSet;
@@ -27,6 +27,9 @@ public class PlayerRenderTarget : ILoadable
         Main.QueueMainThreadAction(() => Target = new(Main.instance.GraphicsDevice, frameWidth * 10, frameHeight)); //10 is probably more than enough. I'll be damned if someone plays this mod with over 10 people
 
         On_LegacyPlayerRenderer.DrawPlayer += DrawPlayer;
+        On_PlayerDrawLayers.DrawPlayer_28_ArmOverItem += (_, ref _) => { };
+        On_PlayerDrawLayers.DrawPlayer_12_Skin_Composite += (_, ref _) => { };
+        On_PlayerDrawLayers.DrawPlayer_28_ArmOverItemComposite += (_, ref _) => { };
         IL_LegacyPlayerRenderer.DrawPlayerInternal += (il) =>
         {
             var c = new ILCursor(il);
@@ -41,7 +44,7 @@ public class PlayerRenderTarget : ILoadable
             }); //yoink
         };
 
-        //wouldn't have known to do this without slr!thanks slr
+        //wouldn't have known to do this color stuff without slr!thanks slr
         On_Lighting.GetColorClamped += (orig, x, y, oldColor) => targetInUse ? oldColor : orig(x, y, oldColor);
         On_Player.GetHairColor += (orig, self, useLighting) => orig(self, useLighting & !targetInUse);
     }

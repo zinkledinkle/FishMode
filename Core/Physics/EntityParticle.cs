@@ -29,10 +29,17 @@ public class EntityParticle(Vector2 position, float mass, float radius) : IParti
         MaxInstances = 1,
         PitchVariance = 0.2f,
     };
+    private static readonly SoundStyle Water = new("FishMode/Assets/Sounds/Water", 5, SoundType.Sound)
+    {
+        Volume = 0.4f,
+        MaxInstances = 0,
+        PitchVariance = 0.4f,
+    };
     private int timeSinceLastSplat = 0;
     #endregion
 
     public Vector2 Position { get; set; } = position;
+    private Vector2 oldVel;
     public Vector2 Velocity { get; set; }
     public Vector2 Force { get; set; }
     public float Mass { get; set; } = mass;
@@ -81,6 +88,40 @@ public class EntityParticle(Vector2 position, float mass, float radius) : IParti
         this.Restitution = bounce;
         this.gravity = gravity;
     }
+    public void AddEnviromentalValues(
+        float airDrag = 0f,
+        float waterDrag = 0f,
+        float lavaDrag = 0f,
+        float honeyDrag = 0f,
+        float shimmerDrag = 0f,
+        float bounce = 0f,
+        float gravity = 0f)
+    {
+        this.airDrag += airDrag;
+        this.waterDrag += waterDrag;
+        this.lavaDrag += lavaDrag;
+        this.honeyDrag += honeyDrag;
+        this.shimmerDrag += shimmerDrag;
+        this.Restitution += bounce;
+        this.gravity += gravity;
+    }
+    public void MultiplyEnviromentalValues(
+        float airDrag = 1f,
+        float waterDrag = 1f,
+        float lavaDrag = 1f,
+        float honeyDrag = 1f,
+        float shimmerDrag = 1f,
+        float bounce = 1f,
+        float gravity = 1f)
+    {
+        this.airDrag *= airDrag;
+        this.waterDrag *= waterDrag;
+        this.lavaDrag *= lavaDrag;
+        this.honeyDrag *= honeyDrag;
+        this.shimmerDrag *= shimmerDrag;
+        this.Restitution *= bounce;
+        this.gravity *= gravity;
+    }
     public void ApplyEnviromentalForces()
     {
         if (GetLiquid() == -1)
@@ -93,6 +134,7 @@ public class EntityParticle(Vector2 position, float mass, float radius) : IParti
     }
     public void Update()
     {
+        oldVel = Velocity;
         Force = Vector2.Zero;
         if (dead && Main.rand.NextBool(2))
         {
@@ -114,6 +156,8 @@ public class EntityParticle(Vector2 position, float mass, float radius) : IParti
     public void Step()
     {
         Velocity += Force;
+        if ((Velocity - oldVel).LengthSquared() > 2.1f && Main.rand.NextBool(15) && GetLiquid() > -1)
+            SoundEngine.PlaySound(Water, Position);
         Position += Velocity;
         rotation += angleVel;
     }

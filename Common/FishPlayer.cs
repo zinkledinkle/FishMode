@@ -1,4 +1,3 @@
-using FishMode.UI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -42,6 +41,8 @@ public partial class FishPlayer : ModPlayer
     private bool waveUp;
     private float waveAccel;
 
+    public float hydrodynamics = 0f;
+
     public override void OnEnterWorld()
     {
         Body = new(Player, BodyLength);
@@ -62,14 +63,14 @@ public partial class FishPlayer : ModPlayer
         if (PlayerInput.GetPressedKeys().Contains(Keys.LeftControl) && Main.mouseRight && Main.mouseRightRelease) Body = new PlayerFishBody(Player, BodyLength);
         if (!Player.controlJump) wasdSineTimer = 0; else wasdSineTimer++;
 
-        Player.GetModPlayer<KrillTreePlayer>().KrillPoints = 10;
-
         dashCooldownTime = 120;
         dashDuration = 20;
         dashSpeed = 3f;
         BodyLength = baseBodyLength;
 
         Body?.SetEnviromentalValues(bounce: 1f); //reset to defaults
+
+        hydrodynamics = 0f;
 
         dashCooldown = Math.Max(0, dashCooldown - 1);
         dashTime = Math.Max(0, dashTime - 1);
@@ -125,6 +126,7 @@ public partial class FishPlayer : ModPlayer
         if (freeze) return;
 
         Body.SetEnviromentalValues(gravity: Player.gravity * Player.gravDir);
+        Body?.MultiplyEnviromentalValues(lavaDrag: 1 - hydrodynamics, honeyDrag: 1 - hydrodynamics, waterDrag: 1 - hydrodynamics * 0.3f);
         while (Body.particles.Count < BodyLength)
             Body.AddSegment();
         while (Body.particles.Count > BodyLength)
@@ -132,8 +134,8 @@ public partial class FishPlayer : ModPlayer
 
         Body.Update();
 
-        float countModifier = MathF.Pow(Body.particles.Count, 1.3f) * 0.5f;
-        float moveSpeed = (1f + countModifier) * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f);
+        float countModifier = Body.particles.Count * 0.5f;
+        float moveSpeed = (2f + countModifier) * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f);
         if (MoveMode == FishModeConfig.MovementType.LookAndLock)
         {
             if (Player.controlUp)

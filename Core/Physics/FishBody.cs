@@ -65,6 +65,46 @@ public abstract class FishBody
                 gravity
             );
     }
+    public void AddEnviromentalValues(
+    float airDrag = 0f,
+    float waterDrag = 0f,
+    float lavaDrag = 0f,
+    float honeyDrag = 0f,
+    float shimmerDrag = 0f,
+    float bounce = 0f,
+    float gravity = 0f)
+    {
+        foreach (var particle in particles)
+            particle.AddEnviromentalValues(
+                airDrag,
+                waterDrag,
+                lavaDrag,
+                honeyDrag,
+                shimmerDrag,
+                bounce,
+                gravity
+            );
+    }
+    public void MultiplyEnviromentalValues(
+    float airDrag = 1f,
+    float waterDrag = 1f,
+    float lavaDrag = 1f,
+    float honeyDrag = 1f,
+    float shimmerDrag = 1f,
+    float bounce = 1f,
+    float gravity = 1f)
+    {
+        foreach (var particle in particles)
+            particle.MultiplyEnviromentalValues(
+                airDrag,
+                waterDrag,
+                lavaDrag,
+                honeyDrag,
+                shimmerDrag,
+                bounce,
+                gravity
+            );
+    }
     protected virtual void OnTileCollision(IParticle particle, float velAlongNormal, Vector2 normal, int surroundingSolidTiles, int tileType, int tileX, int tileY)
     {
         if (tileType == -1) return;

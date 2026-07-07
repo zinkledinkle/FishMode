@@ -1,15 +1,15 @@
-<Project Sdk="Tomat.Terraria.ModLoader.Sdk/2.1.0">
+﻿<Project Sdk="Tomat.Terraria.ModLoader.Sdk/2.1.1">
 
+	<PropertyGroup>
+		<TmlBuildBootstrapFeatures>tomat.environmentmodlist;tomat.enablemod;lolxd87.splashskip;tomat.assethotreloading</TmlBuildBootstrapFeatures>
+	</PropertyGroup>
+	
 	<ItemGroup>
 		<Publicize Include="tModLoader;ReLogic;FNA" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <AdditionalFiles Remove="Assets\Textures\bubl.png" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Resource Include="Assets\Textures\bubl.png" />
+	  <Folder Include="Properties\" />
 	</ItemGroup>
 	
 </Project>

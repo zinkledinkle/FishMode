@@ -29,7 +29,7 @@ public class PlayerFishBody : FishBody
     private void FallDamage(float magnitude)
     {
         if (dead) return;
-        if (magnitude > 22f)
+        if (magnitude > 22f && ModContent.GetInstance<FishModeConfig>().ScreenShake)
         {
             float strength = MathF.Min(magnitude + (timeInAir * 0.2f), 100f);
             int time = (int)magnitude + (int)(timeInAir * 0.4f);

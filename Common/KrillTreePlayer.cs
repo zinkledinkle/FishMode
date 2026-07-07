@@ -1,5 +1,6 @@
 using FishMode.Content.KrillTree;
 using FishMode.UI;
+using Terraria;
 using Terraria.GameInput;
 using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
@@ -32,6 +33,10 @@ public class KrillTreePlayer : ModPlayer
         }
         if (Keybinds.OpenKrillTree.JustReleased)
             ModContent.GetInstance<KrillTreeUISystem>().Toggle();
+    }
+    public override void ResetEffects()
+    {
+        if (Main.mouseMiddle && Main.mouseMiddleRelease) KrillPoints ++;
     }
     public override void SaveData(TagCompound tag)
     {

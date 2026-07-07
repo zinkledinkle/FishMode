@@ -1,3 +1,4 @@
+using FishMode.Common;
 using Microsoft.Xna.Framework;
 using System.Collections.Generic;
 using Terraria;
@@ -11,6 +12,8 @@ public class Swordfish : Krill
     public override Vector2 Position => new(-60, 60);
     public override void Apply(Player player)
     {
-        player.GetDamage(DamageClass.Generic) += 0.1f;
+        var speed = player.GetModPlayer<FishPlayer>().Body.particles[0].Velocity.Length();
+        speed = MathHelper.Clamp(speed * 0.05f, 0f, 0.15f);
+        player.GetDamage(DamageClass.Generic) += speed;
     }
 }

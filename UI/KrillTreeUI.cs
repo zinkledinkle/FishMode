@@ -2,24 +2,17 @@ using FishMode.Common;
 using FishMode.Content.KrillTree;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using ReLogic.Graphics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Terraria;
 using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.GameContent.UI.Elements;
 using Terraria.GameInput;
-using Terraria.ID;
-using Terraria.Localization;
 using Terraria.ModLoader;
-using Terraria.ModLoader.UI;
 using Terraria.UI;
 using Terraria.UI.Chat;
-using static ReLogic.Graphics.DynamicSpriteFont;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace FishMode.UI;
 
@@ -104,11 +97,12 @@ public class KrillTreeUI : UIState
     internal static readonly Dictionary<int, Vector2> NodePositions = [];
     internal static List<InterfaceParticle> particles = [];
     public static float Zoom { get; private set; } = 1f;
+    private static float targetZoom = 1f;
     public static Vector2 Pan { get; private set; } = Vector2.Zero;
     private Vector2 oldMouse;
-    private UIPanel panel;
-    private UIPanel selected;
-    private UIPanel meter;
+    private static UIPanel panel;
+    private static UIPanel selected;
+    private static UIPanel meter;
     private static float meterLevel = 0f;
     private static float meterGlow = 0f;
     internal static float hover = 0f;
@@ -208,9 +202,9 @@ public class KrillTreeUI : UIState
     }
     public static void ScrollWheel(UIScrollWheelEvent evt, UIElement _)
     {
-        Zoom += evt.ScrollWheelValue / 600f;
-        Zoom = MathF.Floor(Zoom * 10) / 10;
-        Zoom = MathHelper.Clamp(Zoom, 0.5f, 2f);
+        targetZoom += evt.ScrollWheelValue / 600f;
+        targetZoom = MathF.Floor(targetZoom * 10) / 10;
+        targetZoom = MathHelper.Clamp(targetZoom, 0.5f, 2f);
     }
     public static void LeftClick(UIMouseEvent evt, UIElement _)
     {
@@ -252,6 +246,8 @@ public class KrillTreeUI : UIState
         if (panel._backgroundTexture == null) return;
         panel?.DrawPanel(spriteBatch, panel._borderTexture.Value, panel.BorderColor);
         panel?.DrawPanel(spriteBatch, panel._backgroundTexture.Value, panel.BackgroundColor);
+
+        Zoom = MathHelper.Lerp(Zoom, targetZoom, (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds * 10f);
 
         var rasterizer = new RasterizerState()
         {
@@ -387,7 +383,7 @@ public class KrillTreeUI : UIState
 
         spriteBatch.Draw(pixel, rect, null, new Color(0f, 0.3f, 0.8f));
     }
-    private void DrawTooltip(SpriteBatch spriteBatch)
+    private static void DrawTooltip(SpriteBatch spriteBatch)
     {
         spriteBatch.End();
         spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.UIScaleMatrix);
@@ -464,11 +460,9 @@ public class KrillTreeUI : UIState
             spriteBatch.Draw(star, starpos, null, color * alpha, rot, star.Size() / 2f, 1f, SpriteEffects.None, 0f);
         }
     }
-    private void DrawOcean(SpriteBatch spriteBatch)
+    private static void DrawOcean(SpriteBatch spriteBatch)
     {
-        int layers = 5;
-
-        var rect = new Rectangle(0, 0, Main.screenWidth, Main.screenHeight);
+        var rect = panel.GetInnerDimensions().ToRectangle();
 
         var pixel = TextureAssets.MagicPixel.Value;
         var perlin = Assets.Textures.Noise.Perlin.Asset.Value;
@@ -482,22 +476,10 @@ public class KrillTreeUI : UIState
         shader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
         shader.Parameters["uSize"].SetValue(rect.Size());
         shader.Parameters["uZoom"].SetValue(Zoom);
-        shader.Parameters["uBaseColor"].SetValue(color.ToVector4());
+        shader.Parameters["uPosition"].SetValue(Pan / rect.Size());
         shader.CurrentTechnique.Passes[0].Apply();
 
-        float panY = 0.07f + Pan.Y / 1000f;
-        float startLevel = 0.15f;
-        float panX = 0.5f + (Pan.X / (float)rect.Width) * 0.5f;
-        panX = MathHelper.Clamp(panX, 0f, 1f);
-
-        for (int i = layers - 1; i >= 0; i--)
-        {
-            float level = startLevel + i * 0.03f + (panY * i * 0.1f);
-            float layerFactor = (layers == 1) ? 1f : (i / (float)(layers - 1));
-            float alpha = 1f - (i / (float)layers);
-            var packed = new Color(level, layerFactor, panX, alpha);
-            spriteBatch.Draw(pixel, rect, null, packed);
-        }
+        spriteBatch.Draw(pixel, rect, null, color);
     }
 }
 
@@ -559,6 +541,7 @@ public class KrillNode(int id, Vector2 position)
         var highlight = Assets.Textures.UI.KrillHighlight.Asset.Value;
         var bubble = Assets.Textures.UI.bubl.Asset.Value;
         var glow = Assets.Textures.UI.Glow.Asset.Value;
+        var shadow = Assets.Textures.UI.Shadow.Asset.Value;
 
         bool hovering = false;
         float zoom = KrillTreeUI.Zoom;
@@ -601,10 +584,11 @@ public class KrillNode(int id, Vector2 position)
         glowAlpha = MathHelper.Lerp(glowAlpha, canUnlock ? 1f : 0f, dt * 2f);
         float actualGlowAlphaLol = glowAlpha * (MathF.Sin(dt * 10) * 0.25f + 0.75f);
 
+        spriteBatch.Draw(shadow, pos, null, Color.Black * (1 - glowAlpha), 0f, glowOrig, 0.3f * zoom, SpriteEffects.None, 0f);
         if (canUnlock)
         {
             spriteBatch.blendState = BlendState.Additive;
-            spriteBatch.Draw(glow, pos, null, Color.Cyan * actualGlowAlphaLol, 0f, glowOrig, 0.3f * zoom, SpriteEffects.None, 0f);
+            spriteBatch.Draw(glow, pos, null, Color.LightCyan * actualGlowAlphaLol, 0f, glowOrig, 0.3f * zoom, SpriteEffects.None, 0f);
             spriteBatch.blendState = BlendState.AlphaBlend;
         }
         spriteBatch.Draw(frame, pos, null, Color.White, 0f, frameOrig, (scale * 0.5f + 0.5f) * zoom, SpriteEffects.None, 0f);

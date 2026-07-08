@@ -79,10 +79,10 @@ Krills: {
 
 Keybinds: {
 	LockOn.DisplayName: Lock On
-	Skill1.DisplayName: Skill1
-	Skill2.DisplayName: Skill2
-	Skill3.DisplayName: Skill3
-	Skill4.DisplayName: Skill4
-	Skill5.DisplayName: Skill5
+	Skill1.DisplayName: Krill 1
+	Skill2.DisplayName: Krill 2
+	Skill3.DisplayName: Krill 3
+	Skill4.DisplayName: Krill 4
+	Skill5.DisplayName: Krill 5
 	OpenKrillTree.DisplayName: Open Krill Tree
 }

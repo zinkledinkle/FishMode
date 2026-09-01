@@ -20,11 +20,16 @@ float4 sampleBlur(sampler2D s, float2 uv, float blurPx, float2 texel)
     if (blurPx <= 0)
         return tex2D(s, uv);
     float2 offset = texel * blurPx;
-    float4 color = tex2D(s, uv) * 0.4f;
-    color += tex2D(s, uv + float2(offset.x, 0)) * 0.15f;
-    color += tex2D(s, uv + float2(-offset.x, 0)) * 0.15f;
-    color += tex2D(s, uv + float2(0, offset.y)) * 0.15f;
-    color += tex2D(s, uv + float2(0, -offset.y)) * 0.15f;
+    float amt = 1.f / 9.f;
+    float4 color = tex2D(s, uv) * amt;
+    color += tex2D(s, uv + float2(offset.x, 0)) * amt;
+    color += tex2D(s, uv + float2(-offset.x, 0)) * amt;
+    color += tex2D(s, uv + float2(0, offset.y)) * amt;
+    color += tex2D(s, uv + float2(0, -offset.y)) * amt;
+    color += tex2D(s, uv + float2(offset.x, offset.y)) * amt;
+    color += tex2D(s, uv + float2(-offset.x, offset.x)) * amt;
+    color += tex2D(s, uv + float2(-offset.x, offset.y)) * amt;
+    color += tex2D(s, uv + float2(offset.x, -offset.y)) * amt;
     return color;
 }
 
@@ -33,20 +38,20 @@ float4 Main(VertexShaderOutput input) : COLOR0
     float2 coords = input.TexCoord;
     float4 color = tex2D(uImage0, coords) * input.Color;
     
-    float level = 0.6f;
-    
-    level += uPosition.y * 0.05f;
-    
-    coords.y = 1 - coords.y;
-    coords.x -= 0.5f;
-    coords.y -= uPosition.y;
-    float xOffset = uPosition.x;
-    coords.x += xOffset;
+    float level = 0.7f;
 
-    coords.y = level + (coords.y - level) / uZoom;
-    coords.x = (coords.x - xOffset) / uZoom + xOffset;
+    coords.y = 1 - coords.y;
+    coords -= float2(0.5f, level);
+    coords /= uZoom;
     
-    float gradientHeight = 0.1f;
+    coords.y += level;
+    coords.y -= uPosition.y;
+    coords.y /= level;
+    float distance = (1 - coords.y);
+    coords.x /= distance;
+    coords.x -= uPosition.x / 2;
+
+    float gradientHeight = 0.2f;
     if (coords.y > level)
     {
         if (coords.y < level + gradientHeight)
@@ -55,33 +60,28 @@ float4 Main(VertexShaderOutput input) : COLOR0
         }
         return float4(0, 0, 0, 0);
     }
-    coords.y /= level;
-    float distance = (1 - coords.y);
-    coords.x /= distance;
-    
-    float blurRange = 0.3f / uZoom;
+
+    float blurRange = 0.4f / uZoom;
     float blurFactor = saturate((blurRange - distance) / blurRange);
-    blurFactor = pow(blurFactor, 1.5f);
     
     float2 tx = 1 / uSize.xy;
 
     float2 waveCoords = coords - float2(uTime * 0.08f, uTime * 0.06f / distance);
     waveCoords.y /= 2 * distance;
-    float4 waves = sampleBlur(uImage2, frac(waveCoords / 2), 100 * blurFactor, tx);
+    float4 waves = sampleBlur(uImage2, frac(waveCoords / 2), 5 * blurFactor, tx);
     
     float2 veinCoords = coords + float2(uTime * 0.1f, uTime * 0.03f / distance);
     veinCoords += waves.r * 0.5f;
-    float4 vein = sampleBlur(uImage1, frac(veinCoords / 6), 100 * blurFactor, tx);
+    float4 vein = sampleBlur(uImage1, frac(veinCoords / 6), 200 * blurFactor, tx);
     vein.rgb = float3(0.3f, 0.9f, 0.4f) * vein.r;  
     color += vein;
     
-    float edgeFalloff = saturate(distance * 5);
-    color.rgb *= (edgeFalloff / 3 + 0.6666666f);
+    color.rgb *= (saturate(distance) * 0.75f + 0.25f);
     
     float sunShine = (abs(0.5f - (input.TexCoord.x + (waves.r * 2 - 1) * 0.1f)) * 2) / (distance * 0.5f);
     sunShine = 1 - saturate(sunShine);
     sunShine = pow(sunShine, 1.8f);
-    sunShine *= edgeFalloff;
+    sunShine *= distance;
     float veinLuminosity = (vein.r + vein.g + vein.b) / 3;
     color += sunShine * float4(0.9f, 0.8f, 0.2f, 1) * veinLuminosity * 3;
     

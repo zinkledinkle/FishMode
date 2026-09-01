@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -12,24 +13,28 @@ public class KrillTree
     public IReadOnlyCollection<int> Unlocked => _unlocked;
     public readonly int[] activated = [-1, -1, -1, -1, -1];
     public bool IsActivated(int id) => activated.Contains(id);
-    public void Toggle(int id) => activated[Krills[id].Level - 1] = (activated[Krills[id].Level - 1] == id ? -1 : id);
-    private static readonly Dictionary<string, int> nameToID = [];
+    public void Toggle(int id) => activated[Krills[id].Level - 1] = activated[Krills[id].Level - 1] == id ? -1 : id;
     internal static void Register(Krill krill)
     {
-        krill.ID = _krills.Count;
-        _krills.Add(krill.ID, krill);
-        nameToID.Add(krill.Name, krill.ID);
+        krill._id = _krills.Count;
+        _krills.Add(krill._id, krill);
     }
     public static void EvaluateUnlocks()
     {
         foreach (var krill in Krills)
         {
             krill.Value.IDRequirements.Clear();
-            foreach (var requirement in krill.Value.Requires)
+            foreach (var requirement in krill.Value.Requirements)
             {
-                var requireID = nameToID[requirement];
+                var requireID = Krills.FirstOrDefault(k => k.Value.GetType() == requirement).Key;
                 krill.Value.IDRequirements.Add(requireID);
                 Krills[requireID].Unlocks.Add(krill.Key);
+            }
+            foreach(var combination in krill.Value.CombinesWith)
+            {
+                var combineID = Krills.FirstOrDefault(k => k.Value.GetType() == combination).Key;
+                krill.Value.Combinations.Add(combineID);
+                Krills[combineID].Combinations.Add(krill.Key);
             }
         }
     }

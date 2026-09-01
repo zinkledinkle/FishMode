@@ -1,4 +1,4 @@
-﻿<Project Sdk="Tomat.Terraria.ModLoader.Sdk/2.1.1">
+<Project Sdk="Tomat.Terraria.ModLoader.Sdk/2.1.1">
 
 	<PropertyGroup>
 		<TmlBuildBootstrapFeatures>tomat.environmentmodlist;tomat.enablemod;lolxd87.splashskip;tomat.assethotreloading</TmlBuildBootstrapFeatures>

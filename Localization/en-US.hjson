@@ -1,6 +1,8 @@
-ItemName.GillsPotion: Lungs Potion
+ItemName.ItemName.GillsPotion: Lungs Potion
 
 ItemTooltip: {
+	FlipperPotion: Flipperer Potion
 	GillsPotion: Allows you to breathe air
 	IceSkates: Does absolutely nothing
+	StepStool: man FUCK you this doesnt do anythig
 }

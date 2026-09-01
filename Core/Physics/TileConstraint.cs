@@ -1,8 +1,10 @@
+using FishMode.Utilities;
 using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Terraria;
+using Terraria.Graphics.Renderers;
 
 namespace FishMode.Core.Physics;
 
@@ -46,9 +48,9 @@ public class TileConstraint(IParticle particle) : IConstraint
             }
         }
 
-        foreach (var tile in candidates.OrderBy(t => ClosestPointOnRect(Particle.Position, t).DistanceSQ(Particle.Position)))
+        foreach (var tile in candidates.OrderBy(t => t.ClosestContactPoint(Particle.Position).DistanceSQ(Particle.Position)))
         {
-            Vector2 closestPoint = ClosestPointOnRect(Particle.Position, tile);
+            Vector2 closestPoint = tile.ClosestContactPoint(Particle.Position);
             Vector2 delta = (closestPoint - Particle.Position);
             float dist = delta.Length();
 
@@ -94,10 +96,4 @@ public class TileConstraint(IParticle particle) : IConstraint
 
         TileCollision(Particle, velAlongNormal, normal, totalSurroundingTiles, type, tileX, tileY);
     }
-    private static Vector2 ClosestPointOnRect(Vector2 p, Rectangle rect) =>
-    new(
-        Math.Clamp(p.X, rect.Left, rect.Right),
-        Math.Clamp(p.Y, rect.Top, rect.Bottom)
-    ); //closestpointinrect doesn't work because it just uses the actual sides
-
 }

@@ -46,8 +46,8 @@ Configs: {
 }
 
 Krills: {
-	Bioluminescence1: {
-		DisplayName: Bioluminescence I
+	Bioluminescence: {
+		DisplayName: Bioluminescence
 		Tooltip: Makes you emit light
 	}
 
@@ -66,14 +66,54 @@ Krills: {
 		Tooltip: +1 Length (longer fish have higher speeds but bigger hitboxes)
 	}
 
-	Hydrodynamics1: {
-		DisplayName: Hydrodynamics I
+	Hydrodynamics: {
+		DisplayName: Hydrodynamics
 		Tooltip: Speeds up movement in viscous liquid by 40%
 	}
 
-	ArmoredScales1: {
-		DisplayName: Armored Scales I
+	ArmoredScales: {
+		DisplayName: Armored Scales
 		Tooltip: +10% Damage Reduction
+	}
+
+	Blubber: {
+		DisplayName: Blubber
+		Tooltip: +25% Damage Reduction, -15% Movement Speed
+	}
+
+	BubbleBlower: {
+		DisplayName: Bubble Blower
+		Tooltip: Ranged attacks spawn small bubbles
+	}
+
+	Electrogenesis: {
+		DisplayName: Electrogenesis
+		Tooltip: Creates a large electric aura that damages enemies moving at higher speeds
+	}
+
+	Jellyfish: {
+		DisplayName: Jellyfish
+		Tooltip: Creates a small electric aura that deals 20 DPS to enemies within it
+	}
+
+	MagicFangs: {
+		DisplayName: Magic Fangs
+		Tooltip: Magic attacks will regenerate mana
+	}
+
+	PistolShrimp: {
+		DisplayName: Pistol Shrimp
+		Tooltip: +60% Ranged projectile velocity
+	}
+
+	Quickfins: {
+		DisplayName: Quickfins
+		Tooltip: +10% movement speed
+	}
+
+	Radiance: {
+		DisplayName: Radiance
+		Tooltip: Makes you emit a very strong light
 	}
 }
 
@@ -86,3 +126,14 @@ Keybinds: {
 	Skill5.DisplayName: Krill 5
 	OpenKrillTree.DisplayName: Open Krill Tree
 }
+
+Projectiles.SmallBubbleProjectile.DisplayName: Small Bubble Projectile
+
+Buffs: {
+	Electrified_NPC: {
+		DisplayName: Electrified_ N P C
+		Description: Mods.FishMode.Buffs.Electrified_NPC.Description
+	}
+}
+
+UI.KrillPointPopup: +1 Krill Point!

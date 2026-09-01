@@ -43,7 +43,7 @@ public class PlayerFishDrawer : ILoadable
         effect.Texture = PlayerRenderTarget.Target;
         effect.TextureEnabled = true;
         effect.CurrentTechnique.Passes[0].Apply();
-        gd.DrawUserPrimitives(PrimitiveType.TriangleList, [..vertices], 0, vertices.Count / 3);
+        gd.DrawUserPrimitives(PrimitiveType.TriangleStrip, [..vertices], 0, vertices.Count - 2);
 
         if (!ModContent.GetInstance<FishModeConfig>().DebugDraw) return;
 
@@ -86,117 +86,52 @@ public class PlayerFishDrawer : ILoadable
             var fplr = player.GetModPlayer<FishPlayer>();
             var particles = fplr.Body.particles;
             var points = particles.Select(p => p.Position).ToList();
+            var source = PlayerRenderTarget.GetPlayerSource(player.whoAmI);
 
             points.Insert(0, points[0] - (points[1] - points[0]));
+            points.Insert(0, points[0] - (points[1] - points[0]));
+            points.Add(points[^1] + (points[^1] - points[^2]));
             points.Add(points[^1] + (points[^1] - points[^2]));
 
-            float width = fplr.Body.particles[0].Radius * 2f; //this is just for the main body, extra padding will be added for more space
-            float targetWidth = (float)PlayerRenderTarget.Target.Width;
-            float widthRatio = targetWidth / width;
+            float width = source.Width;
+            float height = source.Height;
+            float startX = source.X / PlayerRenderTarget.Target.Width;
+            float endX = (source.X + width) / PlayerRenderTarget.Target.Width;
+            float startY = 0f;
+            float endY = 1f;
 
-            float innerWidth = 0.15f; //how much space will be the actual main body
-            float startX = 0.5f - (innerWidth / 2f);
-            float endX = 0.5f + (innerWidth / 2f);
+            width *= 0.5f;
 
-            float sideWidth = PlayerRenderTarget.frameWidth / 2;
-
-            float startY = 0.4f;
-            float endY = 0.6f;
-
-            float heightIncrement = 1 / (float)(points.Count - 1);
-
-            float xIncrement = PlayerRenderTarget.frameWidth / targetWidth;
-            float xLeftBorder = xIncrement * PlayerRenderTarget.GetIndexFromPlayer(player.whoAmI);
-            float x1 = xIncrement * PlayerRenderTarget.GetIndexFromPlayer(player.whoAmI) + startX * xIncrement;
-            float x2 = x1 + (endX - startX) * xIncrement;
-            float xRightBorder = xLeftBorder + xIncrement;
-
-            if (fplr.Body.dead)
+            for (int i = 0; i < points.Count - 1; i++)
             {
-                float deadHeightIncrement = 1f / (float)(particles.Count - 1);
-                for (int i = 0; i < particles.Count; i++)
-                {
-                    var p = particles[i];
-                    float rot = p.rotation;
-                    var pos = p.Position;
-                    Vector2 bottomLeft = pos + new Vector2(-sideWidth, width).RotatedBy(rot);
-                    Vector2 topLeft = pos + new Vector2(-sideWidth, -width).RotatedBy(rot);
-                    Vector2 topRight = pos + new Vector2(sideWidth, -width).RotatedBy(rot);
-                    Vector2 bottomRight = pos + new Vector2(sideWidth, width).RotatedBy(rot);
+                var normal = GetNormal(points, i);
+                var point = points[i];
+                point -= normal.RotatedBy(MathHelper.PiOver2) * 0.5f;
 
-                    float y1 = MathHelper.Lerp(startY, endY, (i + 1) * deadHeightIncrement);
-                    float y2 = MathHelper.Lerp(startY, endY, (i) * deadHeightIncrement);
+                var left = point + normal * width;
+                var right = point - normal * width;
+                var colorLeft = FromVec3(Lighting.GetSubLight(left));
+                var colorRight = FromVec3(Lighting.GetSubLight(right));
 
-                    vertices.Add(new(new(bottomLeft.X, bottomLeft.Y, 0f), Color.White, new(xLeftBorder, y2)));
-                    vertices.Add(new(new(topLeft.X, topLeft.Y, 0f), Color.White, new(xLeftBorder, y1)));
-                    vertices.Add(new(new(bottomRight.X, bottomRight.Y, 0f), Color.White, new(xRightBorder, y2)));
+                var texCoordY = i / (float)(points.Count - 1);
+                texCoordY = MathHelper.Lerp(startY, endY, texCoordY);
 
-                    vertices.Add(new(new(bottomRight.X, bottomRight.Y, 0f), Color.White, new(xRightBorder, y2)));
-                    vertices.Add(new(new(topLeft.X, topLeft.Y, 0f), Color.White, new(xLeftBorder, y1)));
-                    vertices.Add(new(new(topRight.X, topRight.Y, 0f), Color.White, new(xRightBorder, y1)));
-                }
-                continue;
-            }
+                vertices.Add(new(new(left, 0f), colorLeft, new(startX, texCoordY)));
+                vertices.Add(new(new(right, 0f), colorRight, new(endX, texCoordY)));
 
-            Vector2 firstNormal = GetNormal(points, 0);
-            Vector2 prev1 = points[0] + firstNormal * width;
-            Vector2 prev2 = points[0] - firstNormal * width;
-            Vector2 prevLeftExtension = prev1 + firstNormal * (width + sideWidth);
-            Vector2 prevRightExtension = prev2 - firstNormal * (width + sideWidth);
+                var nextNormal = GetNormal(points, i + 1);
+                var nextPoint = points[i + 1];
+                    
+                var nextLeft = nextPoint + nextNormal * width;
+                var nextRight = nextPoint - nextNormal * width;
+                var nextColorLeft = FromVec3(Lighting.GetSubLight(nextLeft));
+                var nextColorRight = FromVec3(Lighting.GetSubLight(nextRight));
 
-            for (int i = 1; i < points.Count; i++)
-            {
-                var a = points[i];
+                var nextTexCoordY = (i + 1) / (float)(points.Count - 1);
+                nextTexCoordY = MathHelper.Lerp(startY, endY, nextTexCoordY);
 
-                Vector2 normal = GetNormal(points, i);
-                Vector2 a1 = a + normal * width;
-                Vector2 a2 = a - normal * width;
-
-                Vector2 leftExtensionA = a1 + normal * (sideWidth - width);
-                Vector2 rightExtensionA = a2 - normal * (sideWidth - width);
-
-                Color cP1 = FromVec3(Lighting.GetSubLight(prev1));
-                Color cP2 = FromVec3(Lighting.GetSubLight(prev2));
-                Color cA1 = FromVec3(Lighting.GetSubLight(a1));
-                Color cA2 = FromVec3(Lighting.GetSubLight(a2));
-
-                Color cPL = FromVec3(Lighting.GetSubLight(prevLeftExtension));
-                Color cPR = FromVec3(Lighting.GetSubLight(prevRightExtension));
-                Color cLA = FromVec3(Lighting.GetSubLight(leftExtensionA));
-                Color cRA = FromVec3(Lighting.GetSubLight(rightExtensionA));
-
-                float y1 = MathHelper.Lerp(startY, endY, i * heightIncrement);
-                float y2 = MathHelper.Lerp(startY, endY, (i - 1) * heightIncrement);
-
-                //main body, isolated to prevent too much wacky folding
-                vertices.Add(new(new(a1.X, a1.Y, 0f), cA1, new(x1, y1)));
-                vertices.Add(new(new(prev1.X, prev1.Y, 0f), cP1, new(x1, y2)));
-                vertices.Add(new(new(prev2.X, prev2.Y, 0f), cP2, new(x2, y2)));
-
-                vertices.Add(new(new(a1.X, a1.Y, 0f), cA1, new(x1, y1)));
-                vertices.Add(new(new(prev2.X, prev2.Y, 0f), cP2, new(x2, y2)));
-                vertices.Add(new(new(a2.X, a2.Y, 0f), cA2, new(x2, y1)));
-
-                //left extension
-                vertices.Add(new(new(leftExtensionA.X, leftExtensionA.Y, 0f), cLA, new(xLeftBorder, y1)));
-                vertices.Add(new(new(prevLeftExtension.X, prevLeftExtension.Y, 0f), cPL, new(xLeftBorder, y2)));
-                vertices.Add(new(new(a1.X, a1.Y, 0f), cA1, new(x1, y1)));
-
-                vertices.Add(new(new(a1.X, a1.Y, 0f), cA1, new(x1, y1)));
-                vertices.Add(new(new(prevLeftExtension.X, prevLeftExtension.Y, 0f), cPL, new(xLeftBorder, y2)));
-                vertices.Add(new(new(prev1.X, prev1.Y, 0f), cP1, new(x1, y2)));
-
-                //right extension
-                vertices.Add(new(new(a2.X, a2.Y, 0f), cA2, new(x2, y1)));
-                vertices.Add(new(new(prev2.X, prev2.Y, 0f), cP2, new(x2, y2)));
-                vertices.Add(new(new(rightExtensionA.X, rightExtensionA.Y, 0f), cRA, new(xRightBorder, y1)));
-
-                vertices.Add(new(new(rightExtensionA.X, rightExtensionA.Y, 0f), cRA, new(xRightBorder, y1)));
-                vertices.Add(new(new(prev2.X, prev2.Y, 0f), cP2, new(x2, y2)));
-                vertices.Add(new(new(prevRightExtension.X, prevRightExtension.Y, 0f), cPR, new(xRightBorder, y2)));
-
-                (prev1, prev2) = (a1, a2);
-                (prevLeftExtension, prevRightExtension) = (leftExtensionA, rightExtensionA);
+                vertices.Add(new(new(nextLeft, 0f), nextColorLeft, new(startX, nextTexCoordY)));
+                vertices.Add(new(new(nextRight, 0f), nextColorRight, new(endX, nextTexCoordY)));
             }
         }
     }

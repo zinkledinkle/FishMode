@@ -7,7 +7,6 @@ using Terraria.Graphics;
 using Terraria.DataStructures;
 using MonoMod.Cil;
 using System.Reflection;
-using System;
 using FishMode.Common;
 
 namespace FishMode.Core;
@@ -15,8 +14,8 @@ namespace FishMode.Core;
 public class PlayerRenderTarget : ILoadable
 {
     public static RenderTarget2D Target { get; private set; }
-    public const int frameWidth = 200;
-    public const int frameHeight = 300;
+    public const int frameWidth = 50;
+    public const int frameHeight = 100; //we don't need the target to include items so they don't have to be very big #lol!
     private static bool targetInUse = false;
 
     private static PlayerDrawSet curDrawSet;
@@ -82,16 +81,20 @@ public class PlayerRenderTarget : ILoadable
         var _heldProj = drawPlayer.heldProj;
         var _itemPos = drawPlayer.itemLocation;
         var _immuneAlpha = drawPlayer.immuneAlpha;
+        var _bodyFrame = drawPlayer.bodyFrame;
+        var _legFrame = drawPlayer.legFrame;
 
         Vector2 off = new(GetIndexFromPlayer(drawPlayer.whoAmI) * frameWidth + frameWidth / 2f, frameHeight / 2f);
         Main.screenPosition = Vector2.Zero;
         var newPos = off - drawPlayer.Size / 2f;
         drawPlayer.heldProj = -1;
-        drawPlayer.itemLocation = Vector2.Zero;
+        drawPlayer.itemLocation = Vector2.One * 10000000000f;
         drawPlayer.position = _pos;
         drawPlayer.Center = _center - _pos + newPos;
         drawPlayer.MountedCenter = _mountedCenter - _pos + off;
 
+        drawPlayer.bodyFrame.Y = 0;
+        drawPlayer.legFrame.Y = 0;
         drawPlayer.headPosition = Vector2.Zero;
         drawPlayer.legPosition = Vector2.Zero;
         drawPlayer.bodyPosition = Vector2.Zero;
@@ -108,6 +111,8 @@ public class PlayerRenderTarget : ILoadable
         drawPlayer.Center = _center;
         drawPlayer.MountedCenter = _mountedCenter;
         drawPlayer.immuneAlpha = _immuneAlpha;
+        drawPlayer.legFrame = _legFrame;
+        drawPlayer.bodyFrame = _bodyFrame;
 
         gd.SetRenderTargets(prev);
 
@@ -128,7 +133,7 @@ public class PlayerRenderTarget : ILoadable
         {
             curDrawSet.ItemLocation = _itemPos;
             int count = curDrawSet.DrawDataCache.Count;
-            PlayerDrawLayers.DrawPlayer_27_HeldItem(ref curDrawSet); //draw the item later
+            PlayerDrawLayers.DrawPlayer_27_HeldItem(ref curDrawSet);
             if (curDrawSet.DrawDataCache.Count == count) return; //nothing got added
             var draw = curDrawSet.DrawDataCache[^1];
             draw.color = Lighting.GetColor((int)_itemPos.X / 16, (int)_itemPos.Y / 16);

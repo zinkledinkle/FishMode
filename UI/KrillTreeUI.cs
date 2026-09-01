@@ -81,13 +81,13 @@ public class KrillTreeUI : UIState
     private static KrillTree? PlayerTree => ModPlayer?.KrillTree;
     private static SoundStyle UnlockKrill = new("FishMode/Assets/Sounds/UI/UnlockKrill", SoundType.Sound)
     {
-        Volume = 0.6f,
+        Volume = 0.65f,
         MaxInstances = 1,
         PitchVariance = 0.2f
     };
     private static SoundStyle Click = new("FishMode/Assets/Sounds/UI/Click", 4, SoundType.Sound)
     {
-        Volume = 0.5f,
+        Volume = 0.9f,
         MaxInstances = 1,
         PitchVariance = 0.15f
     };
@@ -96,6 +96,7 @@ public class KrillTreeUI : UIState
     internal static int HoveringNodeIndex = -1;
     internal static readonly Dictionary<int, Vector2> NodePositions = [];
     internal static List<InterfaceParticle> particles = [];
+    internal static List<PointCountParticle> pointCountParticles = [];
     public static float Zoom { get; private set; } = 1f;
     private static float targetZoom = 1f;
     public static Vector2 Pan { get; private set; } = Vector2.Zero;
@@ -104,7 +105,6 @@ public class KrillTreeUI : UIState
     private static UIPanel selected;
     private static UIPanel meter;
     private static float meterLevel = 0f;
-    private static float meterGlow = 0f;
     internal static float hover = 0f;
     internal static string hoverName;
     internal static string hoverTooltip;
@@ -153,7 +153,7 @@ public class KrillTreeUI : UIState
         meter.Height.Set(256, 0f);
         meter.HAlign = 1f;
         meter.VAlign = 0.5f;
-        meter.BackgroundColor = selected.BorderColor = Color.Transparent;
+        meter.BackgroundColor = meter.BorderColor = Color.Transparent;
         panel.Append(meter);
 
         foreach (var krill in KrillTree.Krills)
@@ -221,6 +221,7 @@ public class KrillTreeUI : UIState
         }
         else if (PlayerTree.CanUnlock(node.ID) && ModPlayer.KrillPoints >= 1f)
         {
+            pointCountParticles.Add(new((int)ModPlayer.KrillPoints));
             ModPlayer.KrillPoints--;
             PlayerTree.Unlock(node.ID);
             node.unlocked = true;
@@ -241,6 +242,7 @@ public class KrillTreeUI : UIState
     public override void Draw(SpriteBatch spriteBatch)
     {
         HoveringNodeIndex = -1;
+
         if (panel == null) return;
         if (panel._borderTexture == null) return;
         if (panel._backgroundTexture == null) return;
@@ -268,22 +270,24 @@ public class KrillTreeUI : UIState
         foreach (var node in nodes)
             node.Draw(spriteBatch);
 
-        hover += (HoveringNodeIndex != -1 ? 10f : -10f) * (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds;
-        hover = MathHelper.Clamp(hover, 0, 1);
-
         for (int i = particles.Count - 1; i >= 0; i--)
         {
             var particle = particles[i];
             particle.Update((float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds * 60f);
             particle.Draw(spriteBatch, Pan, Zoom);
             if (particle.Scale <= 0f || particle.Alpha <= 0f)
-            {
                 particles.RemoveAt(i);
-            }
             else
-            {
                 particles[i] = particle;
-            }
+        }
+        for (int i = pointCountParticles.Count - 1; i >= 0; i--)
+        {
+            var particle = pointCountParticles[i];
+            particle.Update((float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds * 60f);
+            if (particle.alpha <= 0f)
+                pointCountParticles.RemoveAt(i);
+            else
+                pointCountParticles[i] = particle;
         }
 
         DrawSelected(spriteBatch);
@@ -291,6 +295,9 @@ public class KrillTreeUI : UIState
         DrawMeter(spriteBatch);
 
         DrawTooltip(spriteBatch);
+
+        hover += (HoveringNodeIndex != -1 ? 10f : -10f) * (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds;
+        hover = MathHelper.Clamp(hover, 0, 1);
     }
     private void DrawSelected(SpriteBatch spriteBatch)
     {
@@ -308,8 +315,17 @@ public class KrillTreeUI : UIState
             int krillID = PlayerTree.activated[i];
             if (krillID == -1) continue;
 
-            float targetScale = Main.MouseScreen.DistanceSQ(pos) < 400f ? 1.2f : 1f;
+            bool hovering = Main.MouseScreen.DistanceSQ(pos) < 400f;
+            float targetScale = hovering ? 1.2f : 1f;
             equipScales[i] = MathHelper.Lerp(equipScales[i], targetScale, (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds * 20f);
+
+            if (hovering)
+            {
+                hoverName = KrillTree.Krills[krillID].DisplayName.Value;
+                hoverTooltip = KrillTree.Krills[krillID].Tooltip.Value;
+                hoverLevel = KrillTree.Krills[krillID].Level;
+                HoveringNodeIndex = -80085;
+            }
 
             var texture = KrillTree.Krills[krillID].TextureValue;
 
@@ -322,8 +338,12 @@ public class KrillTreeUI : UIState
             spriteBatch.Draw(texture, pos + krillOffset, null, Color.White, rot, texture.Size() / 2f, scale, SpriteEffects.None, 0f);
         }
     }
-    private void DrawMeter(SpriteBatch spriteBatch)
+    private static void DrawMeter(SpriteBatch spriteBatch)
     {
+        float dt = (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds;
+        foreach (var p in pointCountParticles)
+            p.Update(dt);
+
         var rect = meter.GetDimensions().ToRectangle();
         int xPadding = 16;
         int yPadding = 16;
@@ -334,27 +354,7 @@ public class KrillTreeUI : UIState
         var vein = Assets.Textures.Noise.Vein.Asset.Value;
         var shader = Assets.Effects.MeterShader.Asset.Value;
 
-        float dt = (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds;
-        meterLevel = MathHelper.Lerp(meterLevel, MathHelper.Clamp(ModPlayer.KrillPoints, 0f, 1f), dt * 5f);
-        meterGlow = MathHelper.Lerp(meterGlow, ModPlayer.KrillPoints >= 1 ? 1f : 0f, dt * 3f);
-
-        if (meterGlow > 0.1f)
-        {
-            int count = 8;
-            for (int i = 0; i < count; i++)
-            {
-                float time = (float)Main.timeForVisualEffects / 60f;
-                var newRect = rect;
-                float offset = (i / (float)count) * MathHelper.TwoPi;
-                time += offset;
-                float dist = 7f;
-                int xOff = (int)(Math.Sin(time) * (int)(meterGlow * dist));
-                int yOff = (int)(Math.Cos(time) * (int)(meterGlow * dist));
-                newRect.X += xOff;
-                newRect.Y += yOff;
-                spriteBatch.Draw(bar, newRect, null, Color.LightBlue with { A = 0 } * meterGlow * (1 / (float)count) * 2);
-            }
-        }
+        meterLevel = MathHelper.Lerp(meterLevel, ModPlayer.KrillPoints - (int)Math.Floor(ModPlayer.KrillPoints), dt * 5f);
 
         spriteBatch.Draw(bar, rect, null, Color.White);
 
@@ -363,7 +363,9 @@ public class KrillTreeUI : UIState
         var text = availablePoints.ToString();
         var font = FontAssets.DeathText.Value;
         var origin = font.MeasureString(text) / 2f;
-        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, text, textPos, Color.White, Color.Navy, 0f, origin, Vector2.One);
+        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, text, textPos, Color.White, Color.Blue with { A = 0 } * 0.5f, 0f, origin, Vector2.One, -1, 4f);
+        foreach (var p in pointCountParticles)
+            p.Draw(textPos, Main.spriteBatch);
 
         rect.X += xPadding;
         rect.Width -= xPadding * 2;
@@ -432,11 +434,25 @@ public class KrillTreeUI : UIState
         spriteBatch.Draw(bar, rect, middle, Color.White);
         spriteBatch.Draw(bar, pos + Vector2.UnitX * (rect.Width + rightEdge.Width), rightEdge, Color.White);
 
-        var textPos = pos + new Vector2(10, 25);
+        spriteBatch.End();
+        var matrix = Main.UIScaleMatrix;
+        float minSkew = -0.1f;
+        float maxSkew = -0.2f;
+        var skew = MathHelper.Lerp(minSkew, maxSkew, MathF.Sin((float)Main.timeForVisualEffects / 60f) * 0.5f + 0.5f);
+        matrix.M21 = skew;
+        var invMatrix = Matrix.Invert(matrix);
+        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.AnisotropicClamp, DepthStencilState.Default, Main.Rasterizer, null, matrix);
+
+        var untransformedTextPos = pos + new Vector2(15, 25);
+        var textPos = Vector2.Transform(untransformedTextPos, invMatrix);
+        textPos.X -= (skew - minSkew) * 20;
         ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, hoverName, textPos, Color.Black * eased, color * eased, 0f, Vector2.Zero, Vector2.One * titleScale);
 
+        spriteBatch.End();
+        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.UIScaleMatrix);
+
         string tooltip = font.CreateWrappedText(hoverTooltip, textLength / tooltipScale * 2);
-        var tooltipPos = textPos + new Vector2(0, 40);
+        var tooltipPos = untransformedTextPos + new Vector2(-8, 40);
         ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, tooltip, tooltipPos, Color.White * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
 
         List<Vector2> starPositions = hoverLevel switch
@@ -447,7 +463,7 @@ public class KrillTreeUI : UIState
             4 => [new(-20, -5), new(20, -5), new(-20, 25), new(20, 25)],
             _ => [new(-40, -5), new(0, -5), new(40, -5), new(-20, 20), new(20, 20)],
         };
-        var basePos = pos + new Vector2(paddedLengthForStars - 60, 40);
+        var basePos = pos + new Vector2(paddedLengthForStars - 60, 45);
         var star = Assets.Textures.UI.Star.Asset.Value;
         float time = (float)Main.timeForVisualEffects / 60f;
         foreach(var offset in starPositions)
@@ -510,7 +526,7 @@ public class KrillNode(int id, Vector2 position)
             Vector2 midPoint = (otherPos + pos) / 2f;
             float lineRot = (otherPos - pos).ToRotation() + MathHelper.PiOver2;
 
-            if (unlocked)
+            if (unlocked && !Main.LocalPlayer.GetModPlayer<KrillTreePlayer>().KrillTree.Unlocked.Contains(unlockID))
             {
                 float alpha = MathF.Sin((float)Main.timeForVisualEffects / MathHelper.TwoPi / 2f) * 0.25f + 0.75f;
 
@@ -584,7 +600,7 @@ public class KrillNode(int id, Vector2 position)
         glowAlpha = MathHelper.Lerp(glowAlpha, canUnlock ? 1f : 0f, dt * 2f);
         float actualGlowAlphaLol = glowAlpha * (MathF.Sin(dt * 10) * 0.25f + 0.75f);
 
-        spriteBatch.Draw(shadow, pos, null, Color.Black * (1 - glowAlpha), 0f, glowOrig, 0.3f * zoom, SpriteEffects.None, 0f);
+        spriteBatch.Draw(shadow, pos, null, Color.Black * (1 - glowAlpha), 0f, glowOrig, 0.25f * zoom, SpriteEffects.None, 0f);
         if (canUnlock)
         {
             spriteBatch.blendState = BlendState.Additive;

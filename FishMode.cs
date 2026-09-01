@@ -29,13 +29,14 @@ public class FishMode : Mod
                 var text = UIModConfig.Tooltip;
                 if (text.Contains("{UpBind}") && text.Contains("{LockBind}"))
                 {
-                    var up = PlayerInput.CurrentProfile.InputModes[PlayerInput.CurrentInputMode].KeyStatus["Up"].FirstOrDefault();
+                    var inputMode = PlayerInput.CurrentInputMode;
+                    if (inputMode == InputMode.Mouse) inputMode = InputMode.Keyboard;
+                    var up = PlayerInput.CurrentProfile.InputModes[inputMode].KeyStatus["Up"].FirstOrDefault();
                     if (string.IsNullOrEmpty(up))
                         up = "{UNBOUND}";
-                    var lockon = Keybinds.LockBind.GetAssignedKeys(PlayerInput.CurrentInputMode).FirstOrDefault();
+                    var lockon = Keybinds.LockBind.GetAssignedKeys(inputMode).FirstOrDefault();
                     if (string.IsNullOrEmpty(lockon))
                         lockon = "{UNBOUND}";
-                    Main.NewText(up + ", " + lockon);
                     text = text.Replace("{UpBind}", up).Replace("{LockBind}", lockon);
                 }
                 UICommon.TooltipMouseText(text);

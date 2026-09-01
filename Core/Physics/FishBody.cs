@@ -147,12 +147,11 @@ public abstract class FishBody
             particle.Force = Main.rand.NextVector2Circular(speed, speed);
         }
     }
-    public virtual void Propel(float speed, Vector2 target, float falloff = 0.4f)
+    public virtual void Propel(float speed, Vector2 dir, float falloff = 0.4f)
     {
         if (dead) return;
         foreach (var particle in particles)
         {
-            var dir = particle.Position.DirectionTo(target).SafeNormalize(Vector2.Zero);
             float air = Submerged ? 1f : 0.3f;
             var vel = dir * speed * air;
             vel.Y *= air;

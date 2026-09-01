@@ -20,18 +20,13 @@ public partial class FishPlayer : ModPlayer
     }
     private static FishModeConfig.MovementType MoveMode => ModContent.GetInstance<FishModeConfig>().MovementMode;
 
+    public Vector2 lookDir;
+
     public bool lastF = false;
     public bool lastG = false;
 
     public bool freeze = false;
     public bool disable = false;
-
-    private int dashCooldown;
-    private int dashTime;
-
-    public int dashCooldownTime;
-    public int dashDuration;
-    public float dashSpeed;
 
     public bool hasWave = false;
     private int wasdSineTimer;
@@ -63,17 +58,11 @@ public partial class FishPlayer : ModPlayer
         if (PlayerInput.GetPressedKeys().Contains(Keys.LeftControl) && Main.mouseRight && Main.mouseRightRelease) Body = new PlayerFishBody(Player, BodyLength);
         if (!Player.controlJump) wasdSineTimer = 0; else wasdSineTimer++;
 
-        dashCooldownTime = 120;
-        dashDuration = 20;
-        dashSpeed = 3f;
         BodyLength = baseBodyLength;
 
         Body?.SetEnviromentalValues(bounce: 1f); //reset to defaults
 
         hydrodynamics = 0f;
-
-        dashCooldown = Math.Max(0, dashCooldown - 1);
-        dashTime = Math.Max(0, dashTime - 1);
 
         hasWave = false;
 
@@ -138,12 +127,10 @@ public partial class FishPlayer : ModPlayer
         float moveSpeed = (2f + countModifier) * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f);
         if (MoveMode == FishModeConfig.MovementType.LookAndLock)
         {
+            lookDir = (Main.MouseWorld - Body.particles[0].Position).SafeNormalize(Vector2.Zero);
             if (Player.controlUp)
-            {
-                Body.Propel(moveSpeed, Main.MouseWorld, 0.3f);
-            }
-            var dir = Main.MouseWorld - Body.particles[0].Position;
-            if (Body.Submerged && Player.controlUp) WaveShit(dir);
+                Body.Propel(moveSpeed, lookDir, 0.3f);
+            if (Body.Submerged && Player.controlUp) WaveShit(lookDir);
         }
         else
         {
@@ -153,13 +140,14 @@ public partial class FishPlayer : ModPlayer
             var up = Player.controlUp.ToDirectionInt();
             Vector2 input = new(right - left, down - up);
             if (input == Vector2.Zero) return;
+            input = input.SafeNormalize(Vector2.Zero);
             if (Body.Submerged)
             {
                 var sine = MathF.Sin(wasdSineTimer / MathF.PI / 60f * 40f);
                 input = input.RotatedBy(sine * 0.4f);
             }
 
-            Body.Propel(moveSpeed, Body.particles[0].Position + input, 0.3f);
+            Body.Propel(moveSpeed, input, 0.3f);
             WaveShit(input);
         }
     }

@@ -36,7 +36,7 @@ public record struct InterfaceParticle(int Type, Vector2 Position, Vector2 Veloc
 public record struct PointCountParticle(int Count)
 {
     private Vector2 position;
-    private Vector2 velocity = new(Main.rand.NextFloatDirection() * 0.2f, -3f);
+    private Vector2 velocity = new(Main.rand.NextFloatDirection() * 0.2f, -1f);
     private float rotation;
     private float rotVel = Main.rand.NextFloatDirection() * 0.1f;
     public float alpha = 1f;
@@ -44,9 +44,9 @@ public record struct PointCountParticle(int Count)
     {
         position += velocity;
         velocity *= new Vector2(0.99f, 1f);
-        velocity += Vector2.UnitY * 0.1f;
+        velocity += Vector2.UnitY * 0.1f * dt;
         alpha -= 0.02f * dt;
-        rotation += rotVel;
+        rotation += rotVel * dt;
         rotVel -= rotVel * 0.02f * dt;
     }
     public readonly void Draw(Vector2 originalPosition, SpriteBatch spriteBatch)
@@ -54,6 +54,6 @@ public record struct PointCountParticle(int Count)
         var text = Count.ToString();
         var font = FontAssets.DeathText.Value;
         var origin = font.MeasureString(text) / 2f;
-        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, text, originalPosition + position, Color.White * alpha * 0.5f, Color.Blue with { A = 0 } * 0.25f * alpha, 0f, origin, Vector2.One, -1, 4f);
+        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, text, originalPosition + position, Color.White * alpha * 0.5f, Color.Blue with { A = 0 } * 0.25f * alpha, rotation, origin, Vector2.One, -1, 4f);
     }
 }

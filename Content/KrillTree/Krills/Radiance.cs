@@ -12,7 +12,7 @@ public class Radiance : Krill
     public override Vector2 Position => new(180, 60);
     public override void Apply(Player player)
     {
-        const float strength = 2f;
+        const float strength = 4f;
         Lighting.AddLight(player.Center, Vector3.One * strength);
     }
 }

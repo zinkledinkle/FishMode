@@ -10,6 +10,7 @@ using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.GameContent.UI.Elements;
 using Terraria.GameInput;
+using Terraria.Localization;
 using Terraria.ModLoader;
 using Terraria.UI;
 using Terraria.UI.Chat;
@@ -105,9 +106,12 @@ public class KrillTreeUI : UIState
     private static UIPanel selected;
     private static UIPanel meter;
     private static float meterLevel = 0f;
+    private static float krillPointsLerped = 0f;
     internal static float hover = 0f;
     internal static string hoverName;
     internal static string hoverTooltip;
+    internal static int hoverKrillID;
+    internal static List<int> hoverCombos = [];
     internal static int hoverLevel;
     private readonly List<float> equipScales = [1,1,1,1,1];
     public static void RecheckUnlocks()
@@ -127,7 +131,8 @@ public class KrillTreeUI : UIState
         RemoveAllChildren();
         if (PlayerTree == null) return;
 
-        meterLevel = MathHelper.Clamp(ModPlayer.KrillPoints, 0, 1);
+        krillPointsLerped = ModPlayer.KrillPoints;
+        meterLevel = krillPointsLerped % 1f;
 
         panel = new UIPanel();
         panel.LoadTextures();
@@ -166,7 +171,7 @@ public class KrillTreeUI : UIState
             if (PlayerTree.IsActivated(krill.Key))
                 node.activated = true;
             if (node.unlocked) node.bubbleTimer = 0f;
-            if (PlayerTree.CanUnlock(node.ID) && ModPlayer.KrillPoints >= 1f)
+            if (PlayerTree.CanUnlock(node.ID) && ModPlayer.KrillPoints >= KrillTree.Krills[node.ID].Level)
                 node.canUnlock = true;
 
             nodes.Add(node);
@@ -208,21 +213,22 @@ public class KrillTreeUI : UIState
     }
     public static void LeftClick(UIMouseEvent evt, UIElement _)
     {
-        if (HoveringNodeIndex == -1) return;
+        if (HoveringNodeIndex < 0) return;
         var node = nodes[HoveringNodeIndex];
+        var level = KrillTree.Krills[node.ID].Level;
         if (node.unlocked)
         {
             node.activated = !node.activated;
             PlayerTree.Toggle(node.ID);
-            foreach (var toDeactivate in nodes.Where(n => KrillTree.Krills[n.ID].Level == KrillTree.Krills[node.ID].Level && n.ID != node.ID))
+            foreach (var toDeactivate in nodes.Where(n => KrillTree.Krills[n.ID].Level == level && n.ID != node.ID))
                 toDeactivate.activated = false;
             node.scale = 0.9f;
             SoundEngine.PlaySound(Click);
         }
-        else if (PlayerTree.CanUnlock(node.ID) && ModPlayer.KrillPoints >= 1f)
+        else if (PlayerTree.CanUnlock(node.ID) && ModPlayer.KrillPoints >= level)
         {
             pointCountParticles.Add(new((int)ModPlayer.KrillPoints));
-            ModPlayer.KrillPoints--;
+            ModPlayer.KrillPoints -= level;
             PlayerTree.Unlock(node.ID);
             node.unlocked = true;
             node.bubbleTimer = 1f;
@@ -230,7 +236,7 @@ public class KrillTreeUI : UIState
             node.canUnlock = false;
             SoundEngine.PlaySound(UnlockKrill);
             foreach (var n in nodes)
-                n.canUnlock = PlayerTree.CanUnlock(n.ID) && ModPlayer.KrillPoints >= 1f;
+                n.canUnlock = PlayerTree.CanUnlock(n.ID) && ModPlayer.KrillPoints >= KrillTree.Krills[n.ID].Level;
 
             for (int i = 0; i < Main.rand.Next(15,25); i++)
             {
@@ -241,6 +247,7 @@ public class KrillTreeUI : UIState
     }
     public override void Draw(SpriteBatch spriteBatch)
     {
+        hoverCombos = [];
         HoveringNodeIndex = -1;
 
         if (panel == null) return;
@@ -305,15 +312,68 @@ public class KrillTreeUI : UIState
             return;
         var rect = selected.GetDimensions().ToRectangle();
         var selectedTexture = Assets.Textures.UI.Selected.Asset.Value;
+        var line = Assets.Textures.UI.Line.Asset.Value;
+        var comboBorder = Assets.Textures.UI.CombinationBorder.Asset.Value;
+        Vector2 comboBorderOrigin = comboBorder.Size() / 2f;
 
         spriteBatch.Draw(selectedTexture, rect, null, Color.White);
 
-        Vector2 firstSlot = new Vector2(31.5f, 31.5f) * 2 + rect.TopLeft();
+        Vector2 firstSlot = new Vector2(31.5f, 28f) * 2 + rect.TopLeft();
+
+        int flipComboConnections = 1;
+        float height = 30f;
+        for(int i = 0; i < 5; i++)
+        {
+            var pos = firstSlot + Vector2.UnitX * i * 52 * 2;
+            int krillID = PlayerTree.activated[i];
+            if (krillID == -1) continue;
+            var krill = KrillTree.Krills[krillID];
+
+            List<int> combinationIndices = [];
+            if (krill.Combinations.Count == 0) continue;
+            for (int j = 0; j < 5; j++)
+                if (krill.Combinations.Contains(PlayerTree.activated[j]))
+                    combinationIndices.Add(j);
+            if (Main.MouseScreen.DistanceSQ(pos) < 400f) hoverCombos = [.. combinationIndices.Select(i => PlayerTree.activated[i])];
+
+            foreach(var combination in combinationIndices)
+            {
+                if (combination > i) continue;
+                var otherPos = firstSlot + Vector2.UnitX * combination * 52 * 2;
+                float dist = otherPos.Distance(pos);
+                Vector2 center = (otherPos + pos) / 2f;
+                int arcResolution = (int)(dist / 10f);
+                List<Vector2> arcPoints = [];
+                for(int j = 0; j < arcResolution; j++)
+                {
+                    float t = j / (float)arcResolution;
+                    float sin = (float)Math.Sin(t * MathF.PI);
+                    float cos = (float)Math.Cos(t * MathF.PI) * 0.5f + 0.5f;
+                    Vector2 arcPos = Vector2.Lerp(pos, otherPos, cos) - Vector2.UnitY * sin * height * flipComboConnections;
+                    arcPoints.Add(arcPos);
+                }
+                spriteBatch.DrawLineFromPoints(line, arcPoints, 8f);
+
+                int borderThings = 8;
+                for(int j = 0; j < borderThings; j++)
+                {
+                    float angle = j / (float)borderThings * MathF.Tau + (float)(Main.timeForVisualEffects / 240f);
+                    float borderDist = 40f;
+                    borderDist += (float)Math.Sin(Main.timeForVisualEffects / 120f) * 4f;
+                    Vector2 off = new Vector2(0, -borderDist).RotatedBy(angle);
+                    spriteBatch.Draw(comboBorder, pos + off, null, Color.White, angle, comboBorderOrigin, 0.75f, SpriteEffects.None, 0f);
+                    spriteBatch.Draw(comboBorder, otherPos + off, null, Color.White, angle, comboBorderOrigin, 0.75f, SpriteEffects.None, 0f);
+                }
+                flipComboConnections = -flipComboConnections;
+                height += 20f;
+            }
+        }
         for (int i = 0; i < 5; i++)
         {
             var pos = firstSlot + Vector2.UnitX * i * 52 * 2;
             int krillID = PlayerTree.activated[i];
             if (krillID == -1) continue;
+            var krill = KrillTree.Krills[krillID];
 
             bool hovering = Main.MouseScreen.DistanceSQ(pos) < 400f;
             float targetScale = hovering ? 1.2f : 1f;
@@ -321,13 +381,13 @@ public class KrillTreeUI : UIState
 
             if (hovering)
             {
-                hoverName = KrillTree.Krills[krillID].DisplayName.Value;
-                hoverTooltip = KrillTree.Krills[krillID].Tooltip.Value;
-                hoverLevel = KrillTree.Krills[krillID].Level;
-                HoveringNodeIndex = -80085;
+                hoverName = krill.DisplayName.Value;
+                hoverTooltip = krill.Tooltip.Value;
+                hoverLevel = krill.Level;
+                HoveringNodeIndex = -10 + i;
             }
 
-            var texture = KrillTree.Krills[krillID].TextureValue;
+            var texture = krill.TextureValue;
 
             float offsetForSine = krillID;
             float bob = (float)Math.Sin(Main.timeForVisualEffects / 60f + offsetForSine) * 2f;
@@ -354,7 +414,8 @@ public class KrillTreeUI : UIState
         var vein = Assets.Textures.Noise.Vein.Asset.Value;
         var shader = Assets.Effects.MeterShader.Asset.Value;
 
-        meterLevel = MathHelper.Lerp(meterLevel, ModPlayer.KrillPoints - (int)Math.Floor(ModPlayer.KrillPoints), dt * 5f);
+        krillPointsLerped = MathHelper.Lerp(krillPointsLerped, ModPlayer.KrillPoints, dt * 2f);
+        meterLevel = krillPointsLerped % 1f;
 
         spriteBatch.Draw(bar, rect, null, Color.White);
 
@@ -410,7 +471,7 @@ public class KrillTreeUI : UIState
         float titleScale = 0.6f;
         float tooltipScale = 1f;
         int textLength = (int)(font.MeasureString(hoverName).X * titleScale); //add space for stars
-        int paddedLengthForStars = textLength + 150;
+        int paddedLengthForStars = textLength + 250;
         textLength = Math.Max(textLength, 200);
 
         var leftEdge = new Rectangle(0, 0, 10, 20);
@@ -421,7 +482,7 @@ public class KrillTreeUI : UIState
 
         var bar = Assets.Textures.UI.TitleBar.Asset.Value;
         var gradient = Assets.Textures.UI.Gradient.Asset.Value;
-        int gradientHeight = 150;
+        int gradientHeight = 150 + hoverCombos.Count * 100;
 
         var gradientRect = rect;
         gradientRect.Y += leftEdge.Height;
@@ -451,9 +512,38 @@ public class KrillTreeUI : UIState
         spriteBatch.End();
         spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.UIScaleMatrix);
 
-        string tooltip = font.CreateWrappedText(hoverTooltip, textLength / tooltipScale * 2);
+        string tooltip = font.CreateWrappedText(hoverTooltip, textLength / tooltipScale * 3.5f);
         var tooltipPos = untransformedTextPos + new Vector2(-8, 40);
         ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, tooltip, tooltipPos, Color.White * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
+
+        if (hoverCombos.Count > 0)
+        {
+            var combinesWithPos = tooltipPos + Vector2.UnitY * (font2.MeasureString(tooltip).Y + 16f);
+            var combinesWithText = FishMode.Instance.GetLocalization("UI.CombinesWithText").Value;
+            ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, combinesWithText, combinesWithPos, Color.Gray * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
+
+            var comboPos = combinesWithPos + Vector2.UnitX * (font2.MeasureString(combinesWithText).X + 16f);
+            for (int i = 0; i < hoverCombos.Count; i++)
+            {
+                var type = HoveringNodeIndex >= 0 ? HoveringNodeIndex : ModPlayer.KrillTree.activated[HoveringNodeIndex + 10];
+                var comboType = KrillTree.Krills[hoverCombos[i]];
+                var comboText = comboType.DisplayName + ": ";
+                var (highest, lowest) = hoverLevel > comboType.Level ? (type, hoverCombos[i]) : (hoverCombos[i], type);
+                var comboTooltip = KrillTree.Krills[highest].GetLocalization($"Combine_{KrillTree.Krills[lowest].DisplayName}").Value;
+                var comboColor = comboType.Level switch
+                {
+                    1 => Color.White,
+                    2 => Color.LightGreen,
+                    3 => Color.Cyan,
+                    4 => Color.Orange,
+                    _ => Color.Red
+                };
+                comboText += comboTooltip;
+                comboText = font2.CreateWrappedText(comboText, paddedLengthForStars * 0.55f);
+                ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, comboText, comboPos, comboColor * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
+                comboPos.Y += font2.MeasureString(comboText).Y;
+            }
+        }
 
         List<Vector2> starPositions = hoverLevel switch
         {
@@ -489,8 +579,12 @@ public class KrillTreeUI : UIState
 
         spriteBatch.graphicsDevice.Textures[1] = vein;
         spriteBatch.graphicsDevice.Textures[2] = perlin;
+        spriteBatch.graphicsDevice.SamplerStates[1] = SamplerState.LinearWrap;
+        spriteBatch.graphicsDevice.SamplerStates[2] = SamplerState.LinearWrap;
         shader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
         shader.Parameters["uSize"].SetValue(rect.Size());
+        shader.Parameters["uVeinSize"].SetValue(vein.Size());
+        shader.Parameters["uPerlinSize"].SetValue(perlin.Size());
         shader.Parameters["uZoom"].SetValue(Zoom);
         shader.Parameters["uPosition"].SetValue(Pan / rect.Size());
         shader.CurrentTechnique.Passes[0].Apply();
@@ -573,6 +667,7 @@ public class KrillNode(int id, Vector2 position)
             KrillTreeUI.hoverName = krill.DisplayName.Value;
             KrillTreeUI.hoverTooltip = krill.Tooltip.Value;
             KrillTreeUI.hoverLevel = krill.Level;
+            KrillTreeUI.hoverCombos.AddRange(krill.Combinations);
             hovering = true;
         }
 
@@ -601,7 +696,7 @@ public class KrillNode(int id, Vector2 position)
         float actualGlowAlphaLol = glowAlpha * (MathF.Sin(dt * 10) * 0.25f + 0.75f);
 
         spriteBatch.Draw(shadow, pos, null, Color.Black * (1 - glowAlpha), 0f, glowOrig, 0.25f * zoom, SpriteEffects.None, 0f);
-        if (canUnlock)
+        if (glowAlpha > 0.01f)
         {
             spriteBatch.blendState = BlendState.Additive;
             spriteBatch.Draw(glow, pos, null, Color.LightCyan * actualGlowAlphaLol, 0f, glowOrig, 0.3f * zoom, SpriteEffects.None, 0f);

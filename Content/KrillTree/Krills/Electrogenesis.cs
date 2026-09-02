@@ -49,13 +49,13 @@ public class Electrogenesis : Krill
     }
     public override void Visuals(Player player)
     {
-        const int count = 30;
+        const int count = 50;
         float effectiveRadius = jellyfishCombined ? combinedRadius : radius;
         for (int i = 0; i < count; i++)
         {
             float angle = (float)Main.timeForVisualEffects / 120f + (i / (float)count) * MathF.Tau;
             Vector2 pos = angle.ToRotationVector2() * effectiveRadius;
-            Dust.NewDustPerfect(player.Center + pos, DustID.Electric);
+            Dust.NewDustPerfect(player.Center + pos, DustID.MagnetSphere);
         }
         jellyfishCombined = false;
     }

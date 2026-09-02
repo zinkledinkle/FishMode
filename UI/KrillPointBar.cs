@@ -53,6 +53,7 @@ public class KrillPointBar : UIState
     private static UIPanel meter;
     private static float glow = 0f;
     private static float meterLevel = 0f;
+    private static float krillPointsLerped = 0f;
     private static float enter = 0f;
     private static SoundStyle Plink = Assets.Sounds.UI.KrillParticle.Asset with { Type = SoundType.Sound, Volume = 0.4f, MaxInstances = 3, PitchVariance = 1.5f };
     private static SoundStyle Spawn = Assets.Sounds.UI.SpawnKrillParticle.Asset with { Type = SoundType.Sound, Volume = 0.45f, MaxInstances = 1, PitchVariance = 0.2f };
@@ -140,7 +141,8 @@ public class KrillPointBar : UIState
         var vein = Assets.Textures.Noise.Vein.Asset.Value;
         var shader = Assets.Effects.MeterShader.Asset.Value;
 
-        meterLevel = MathHelper.Lerp(meterLevel, KTP.KrillPoints - (int)Math.Floor(KTP.KrillPoints), dt * 5f);
+        krillPointsLerped = MathHelper.Lerp(krillPointsLerped, KTP.KrillPoints, dt * 5f);
+        meterLevel = krillPointsLerped % 1f;
 
         spriteBatch.Draw(bar, rect, null, Color.White);
 
@@ -244,14 +246,15 @@ public class KrillPointBar : UIState
             var targetPos = dimensions.Bottom() + Main.screenPosition;
             targetPos.Y -= 16;
             targetPos.Y -= meterLevel * 224;
-            if (Time < 60f)
+            float timeToGo = 40f;
+            if (Time < timeToGo)
             {
-                Velocity *= 0.98f;
+                Velocity *= 0.97f;
                 Time = Math.Min(Time, 60);
             } else
             {
                 Vector2 dir = transformedPosition.DirectionTo(targetPos);
-                Vector2 targetVel = dir * ((Time - 60f) / 120f) * 40f;
+                Vector2 targetVel = dir * ((Time - timeToGo) / 120f) * 40f;
                 Velocity = Vector2.Lerp(Velocity, targetVel, 0.06f);
                 if (Velocity.LengthSquared() > 30f * 30f) Velocity = Vector2.Normalize(Velocity) * 30f;
             }
@@ -262,7 +265,9 @@ public class KrillPointBar : UIState
             bool inside = (transformedPosition.X > relativeDimensions.Left && transformedPosition.X < relativeDimensions.Right && transformedPosition.Y > relativeDimensions.Top && transformedPosition.Y < relativeDimensions.Bottom);
             var dist = transformedPosition.DistanceSQ(relativeDimensions.ClosestContactPoint(transformedPosition));
             bool intersect = Velocity.LengthSquared() > dist;
-            return !inside && !intersect;
+            float padding = 400f;
+            bool offScreen = transformedPosition.X < Main.screenPosition.X - padding || transformedPosition.X > Main.screenPosition.X + Main.screenWidth + padding || transformedPosition.Y < Main.screenPosition.Y - padding || transformedPosition.Y > Main.screenPosition.Y + Main.screenHeight + padding;
+            return !inside && !intersect && !offScreen;
         }
     }
 }

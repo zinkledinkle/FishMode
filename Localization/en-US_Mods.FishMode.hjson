@@ -89,6 +89,7 @@ Krills: {
 	Electrogenesis: {
 		DisplayName: Electrogenesis
 		Tooltip: Creates a large electric aura that damages enemies moving at higher speeds
+		Combine_Jellyfish: Increases radius to 500 and deals 40 DPS on top of the electrified debuff
 	}
 
 	Jellyfish: {
@@ -136,4 +137,7 @@ Buffs: {
 	}
 }
 
-UI.KrillPointPopup: +1 Krill Point!
+UI: {
+	KrillPointPopup: +1 Krill Point!
+	CombinesWithText: Combines With:
+}

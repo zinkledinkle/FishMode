@@ -18,8 +18,9 @@ public partial class FishPlayer : ModPlayer
     private float startSwingRot = 0f;
     public override void Load()
     {
-        On_Player.Teleport += (orig, self, pos, style, extraInfo) =>
+        On_Player.Teleport += static (orig, self, pos, style, extraInfo) =>
         {
+            Main.SetCameraLerp(1f, 0);
             orig(self, pos, style, extraInfo);
             var body = self.GetModPlayer<FishPlayer>().Body;
             if (body == null) return;
@@ -28,6 +29,23 @@ public partial class FishPlayer : ModPlayer
             {
                 p.Velocity = Vector2.Zero;
             }
+        };
+        On_Player.Spawn += static (orig, self, context) =>
+        {
+            Main.SetCameraLerp(1f, 0);
+            orig(self, context);
+            var body = self.GetModPlayer<FishPlayer>().Body;
+            if (body == null) return;
+            body.Teleport(self.Center);
+            foreach (var p in body.particles)
+            {
+                p.Velocity = Vector2.Zero;
+            }
+        };
+        On_Player.AddBuff += static (orig, self, type, time, fromnet) =>
+        {
+            if (type == BuffID.Shimmer) return;
+            orig(self, type, time, fromnet);
         };
         On_Player.HorizontalMovement += static (orig, self) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self); };
         On_Player.JumpMovement += static (orig, self) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self); };
@@ -128,7 +146,7 @@ public partial class FishPlayer : ModPlayer
         var skipVanillaSwingLabel = c.DefineLabel();
 
         c.GotoNext(i => i.MatchLdcI4(1)); //itemusestyleid.swing
-        c.Index += 2;
+        c.Index += 5;
         c.EmitBr(skipVanillaSwingLabel);
         c.GotoNext(i => i.MatchLdcI4(7)); //itemusestyleid.drinkold
 
@@ -163,6 +181,7 @@ public partial class FishPlayer : ModPlayer
             self.itemLocation = pos;// + frame.Size() / 2f;
             self.itemRotation = rot - MathHelper.PiOver4 * self.direction;
         });
+        MonoModHooks.DumpIL(Mod, il);
     }
     private void ProjectileCollision(ILContext il)
     {
@@ -182,9 +201,9 @@ public partial class FishPlayer : ModPlayer
 
         c.MarkLabel(loopLabel); //start of loop
 
-        c.GotoNext(i => i.MatchRet());
-        c.Remove();
-        c.EmitBr(endLoopLabel); //continue instead of return
+        c.GotoNext(i => i.MatchBr(out _));
+        c.GotoNext(i => i.MatchBr(out _));
+        c.Next.Operand = endLoopLabel; //continue instead of return
 
         c.GotoNext(i => i.MatchLdarga(1));
         c.Index++;
@@ -201,11 +220,10 @@ public partial class FishPlayer : ModPlayer
             return rect.Intersects(hitbox);
         });
 
-        c.GotoNext(i => i.MatchRet());
-        c.Remove();
-        c.EmitBr(endLoopLabel); //continue instead of return
+        c.GotoNext(i => i.MatchBr(out _));
+        c.Next.Operand = endLoopLabel; //continue instead of return
 
-        c.Index = c.Instrs.Count - 1;
+        c.GotoNext(i => i.MatchRet());
 
         c.MarkLabel(endLoopLabel);
 

@@ -241,7 +241,8 @@ public class KrillPointBar : UIState
         public bool Update(float time)
         {
             Position += Velocity;
-            var transformedPosition = Vector2.Transform(Position, Main.GameViewMatrix.TransformationMatrix);
+            var matrix = Main.GameViewMatrix.TransformationMatrix;
+            var transformedPosition = Vector2.Transform(Position - Main.screenPosition, matrix) + Main.screenPosition;
             var dimensions = meter.GetDimensions().ToRectangle();
             var targetPos = dimensions.Bottom() + Main.screenPosition;
             targetPos.Y -= 16;

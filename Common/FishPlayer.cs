@@ -1,11 +1,15 @@
+using FishMode.Content.Projectiles;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using Terraria;
 using Terraria.GameContent;
+using Terraria.GameContent.Liquid;
+using Terraria.GameContent.Shaders;
 using Terraria.GameInput;
 using Terraria.Graphics;
+using Terraria.Graphics.Effects;
 using Terraria.ModLoader;
 
 namespace FishMode.Common;
@@ -124,7 +128,8 @@ public partial class FishPlayer : ModPlayer
         Body.Update();
 
         float countModifier = Body.particles.Count * 0.5f;
-        float moveSpeed = (2f + countModifier) * (1 + waveAccel) * MathF.Pow(Player.maxRunSpeed - 2f, 2f);
+        float moveSpeed = (2f + countModifier) * (1 + waveAccel) * ((Player.maxRunSpeed - 3f) * 2f + 1f);
+        LiquidRenderer.DEFAULT_OPACITY = [0.1f, 0.3f, 0.3f, 0.15f];
         if (MoveMode == FishModeConfig.MovementType.LookAndLock)
         {
             lookDir = (Main.MouseWorld - Body.particles[0].Position).SafeNormalize(Vector2.Zero);
@@ -185,6 +190,11 @@ public partial class FishPlayer : ModPlayer
         Vector2 fishPos = Body.particles[0].Position;
         Player.Center = fishPos;
         Player.velocity = Body.particles[0].Velocity;
+        if (Main.WaveQuality > 0)
+        {
+            var distortStrength = Player.velocity.Length() / 15f;
+            if (Filters.Scene["WaterDistortion"]._shader is WaterShaderData waterData) waterData.QueueRipple(Body.particles[1].Position, distortStrength, RippleShape.Square, Player.velocity.ToRotation());
+        }
 
         if (Math.Abs(Body.particles[0].Velocity.X) > 1) Player.direction = Math.Sign(Body.particles[0].Velocity.X);
     }

@@ -512,7 +512,7 @@ public class KrillTreeUI : UIState
         spriteBatch.End();
         spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.UIScaleMatrix);
 
-        string tooltip = font.CreateWrappedText(hoverTooltip, textLength / tooltipScale * 3.5f);
+        string tooltip = font.CreateWrappedText(hoverTooltip, textLength / tooltipScale * 3.5f, Language.ActiveCulture.CultureInfo);
         var tooltipPos = untransformedTextPos + new Vector2(-8, 40);
         ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, tooltip, tooltipPos, Color.White * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
 
@@ -539,7 +539,7 @@ public class KrillTreeUI : UIState
                     _ => Color.Red
                 };
                 comboText += comboTooltip;
-                comboText = font2.CreateWrappedText(comboText, paddedLengthForStars * 0.55f);
+                comboText = font2.CreateWrappedText(comboText, paddedLengthForStars * 0.55f, Language.ActiveCulture.CultureInfo);
                 ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, comboText, comboPos, comboColor * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
                 comboPos.Y += font2.MeasureString(comboText).Y;
             }

@@ -9,7 +9,7 @@ using MonoMod.Cil;
 using System.Reflection;
 using FishMode.Common;
 
-namespace FishMode.Core;
+namespace FishMode.Core.Drawing;
 
 public class PlayerRenderTarget : ILoadable
 {

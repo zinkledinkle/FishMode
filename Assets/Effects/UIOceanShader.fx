@@ -3,6 +3,8 @@ sampler2D uImage1 : register(s1);
 sampler2D uImage2 : register(s2);
 
 float2 uSize;
+float2 uVeinSize;
+float2 uPerlinSize;
 float2 uPosition;
 float4 uBaseColor;
 float uTime;
@@ -64,7 +66,7 @@ float4 Main(VertexShaderOutput input) : COLOR0
     float blurRange = 0.4f / uZoom;
     float blurFactor = saturate((blurRange - distance) / blurRange);
     
-    float2 tx = 1 / uSize.xy;
+    float2 tx = 1 / uVeinSize.xy;
 
     float2 waveCoords = coords - float2(uTime * 0.08f, uTime * 0.06f / distance);
     waveCoords.y /= 2 * distance;

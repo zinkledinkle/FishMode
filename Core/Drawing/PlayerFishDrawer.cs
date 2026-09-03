@@ -9,7 +9,7 @@ using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace FishMode.Core;
+namespace FishMode.Core.Drawing;
 
 public class PlayerFishDrawer : ILoadable
 {

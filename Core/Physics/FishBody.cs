@@ -150,10 +150,11 @@ public abstract class FishBody
     public virtual void Propel(float speed, Vector2 dir, float falloff = 0.4f)
     {
         if (dead) return;
+        float air = Submerged ? 1f : 0.3f;
+        float up = Submerged ? 1f : Math.Min(1, 1 - Vector2.Dot(-Vector2.UnitY, dir));
         foreach (var particle in particles)
         {
-            float air = Submerged ? 1f : 0.3f;
-            var vel = dir * speed * air;
+            var vel = dir * speed * air * up;
             vel.Y *= air;
             particle.AddForce(vel);
             speed *= falloff; //all particles contribute but less

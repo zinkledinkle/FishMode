@@ -1,4 +1,21 @@
-ItemName.ItemName.GillsPotion: Lungs Potion
+ItemName: {
+	GillsPotion: Lungs Potion
+	HermesBoots: Hermes Fins
+	RocketBoots: Rocket Fins
+	SpectreBoots: Spectre Fins
+	LightningBoots: Lightning Fins
+	ObsidianWaterWalkingBoots: Obsidian Water Walking Fins
+	WaterWalkingBoots: Water Walking Fins
+	FlurryBoots: Flurry Fins
+	SandBoots: Dunerider Fins
+	FlameWakerBoots: Flame Waker Fins
+	TerrasparkBoots: Terraspark Fins
+	FrostsparkBoots: Frostspark Fins
+	SailfishBoots: Sailfish Fins
+	FlowerBoots: Flower Fins
+	FairyBoots: Fairy Fins
+	AmphibianBoots: Amphibian Fins
+}
 
 ItemTooltip: {
 	FlipperPotion: Flipperer Potion

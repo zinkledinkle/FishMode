@@ -16,9 +16,9 @@ public class PistolShrimp : Krill
     public const float multiplier = 1.6f;
     public override void Load()
     {
-        On_Projectile.NewProjectile_IEntitySource_float_float_float_float_int_int_float_int_float_float_float += static (orig, spawnSource, X, Y, SpeedX, SpeedY, Type, Damage, KnockBack, Owner, ai0, ai1, ai2) =>
+        On_Projectile.NewProjectile_IEntitySource_float_float_float_float_int_int_float_int_float_float_float_NewProjectileModifier += static (orig, spawnSource, X, Y, SpeedX, SpeedY, Type, Damage, KnockBack, Owner, ai0, ai1, ai2, mod) =>
         {
-            int result = orig(spawnSource, X, Y, SpeedX, SpeedY, Type, Damage, KnockBack, Owner, ai0, ai1, ai2);
+            int result = orig(spawnSource, X, Y, SpeedX, SpeedY, Type, Damage, KnockBack, Owner, ai0, ai1, ai2, mod);
             var player = Main.player[Owner];
             var proj = Main.projectile[result];
             if (proj.DamageType == DamageClass.Ranged && player.GetModPlayer<KrillTreePlayer>().KrillTree.activated.Contains(PistolShrimp.Type)) proj.velocity *= multiplier;

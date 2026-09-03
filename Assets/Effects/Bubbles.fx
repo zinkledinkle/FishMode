@@ -19,11 +19,13 @@ struct VertexShaderOutput
     float2 TexCoord : TEXCOORD0;
 };
 
+//normalized 0-1 to closest bubble
 float Field(float2 p, float threshold, out float2 normal)
 {
     float result = 0;
     normal = float2(0, 0);
     float2 delta = float2(0, 0);
+    float eps = 1e-6;
     //why the fuck does it not want to iterate over 128 but its totally okay with 64 twice
     [loop]
     for (uint i = 0; i < 64; i++)
@@ -33,7 +35,7 @@ float Field(float2 p, float threshold, out float2 normal)
         delta = p - uBubbles[i].xy;
         float r = uBubbles[i].z;
         float dist = length(delta);
-        float threshRadius = r / sqrt(max(threshold, 1e-6));
+        float threshRadius = r / sqrt(max(threshold, eps));
         float n = saturate(1 - dist / threshRadius);
         result = max(result, n);
         normal += delta * n;
@@ -48,7 +50,7 @@ float Field(float2 p, float threshold, out float2 normal)
             delta = p - uBubbles[j].xy;
             float r = uBubbles[j].z;
             float dist = length(delta);
-            float threshRadius = r / sqrt(max(threshold, 1e-6));
+            float threshRadius = r / sqrt(max(threshold, eps));
             float n = saturate(1 - dist / threshRadius);
             result = max(result, n);
             normal += delta * n;
@@ -84,11 +86,11 @@ float4 Main(VertexShaderOutput input) : COLOR0
     
     float2 lightDir = float2(-1, -1);
     float highlight = saturate(dot(normal, -lightDir));
-    highlight *= (noise.b * 0.2f + 0.9f);
+    highlight *= (noise.r * 0.2f + 0.9f);
     highlight = pow(highlight, 9);
     float backlight = saturate(dot(normal, lightDir));
     backlight = pow(backlight, 0.7f);
-    backlight *= (noise.b * 0.2f + 0.9f);
+    backlight *= (noise.r * 0.2f + 0.9f);
     
     float rim = pow(invValue, 4);
     

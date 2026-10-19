@@ -1,5 +1,6 @@
 ItemName: {
 	GillsPotion: Lungs Potion
+	FlipperPotion: Flipperer Potion
 	HermesBoots: Hermes Fins
 	RocketBoots: Rocket Fins
 	SpectreBoots: Spectre Fins
@@ -18,8 +19,9 @@ ItemName: {
 }
 
 ItemTooltip: {
-	FlipperPotion: Flipperer Potion
+	Flipper: Grants an additional dash when submerged
+	FlipperPotion: +10% movement speed
 	GillsPotion: Allows you to breathe air
 	IceSkates: Does absolutely nothing
-	StepStool: man FUCK you this doesnt do anythig
+	PortableStool: this doesnt do anythig and I hate you
 }

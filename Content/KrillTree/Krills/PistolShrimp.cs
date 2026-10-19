@@ -11,7 +11,7 @@ namespace FishMode.Content.KrillTree.Krills;
 public class PistolShrimp : Krill
 {
     public override IReadOnlyList<Type> Requirements => [typeof(BubbleBlower)];
-    public override int Level => 3;
+    public override int Level => 2;
     public override Vector2 Position => new(150, -60);
     public const float multiplier = 1.6f;
     public override void Load()
@@ -21,7 +21,7 @@ public class PistolShrimp : Krill
             int result = orig(spawnSource, X, Y, SpeedX, SpeedY, Type, Damage, KnockBack, Owner, ai0, ai1, ai2, mod);
             var player = Main.player[Owner];
             var proj = Main.projectile[result];
-            if (proj.DamageType == DamageClass.Ranged && player.GetModPlayer<KrillTreePlayer>().KrillTree.activated.Contains(PistolShrimp.Type)) proj.velocity *= multiplier;
+            if (proj.DamageType == DamageClass.Ranged && player.GetModPlayer<KrillTreePlayer>().KrillTree.activated.Contains(PistolShrimp.ID)) proj.velocity *= multiplier;
             return result;
         };
     }

@@ -83,6 +83,7 @@ public class PlayerRenderTarget : ILoadable
         var _immuneAlpha = drawPlayer.immuneAlpha;
         var _bodyFrame = drawPlayer.bodyFrame;
         var _legFrame = drawPlayer.legFrame;
+        var _wingFrame = drawPlayer.wingFrame;
 
         Vector2 off = new(GetIndexFromPlayer(drawPlayer.whoAmI) * frameWidth + frameWidth / 2f, frameHeight / 2f);
         Main.screenPosition = Vector2.Zero;
@@ -95,6 +96,7 @@ public class PlayerRenderTarget : ILoadable
 
         drawPlayer.bodyFrame.Y = 0;
         drawPlayer.legFrame.Y = 0;
+        drawPlayer.wingFrame = -1;
         drawPlayer.headPosition = Vector2.Zero;
         drawPlayer.legPosition = Vector2.Zero;
         drawPlayer.bodyPosition = Vector2.Zero;
@@ -113,6 +115,7 @@ public class PlayerRenderTarget : ILoadable
         drawPlayer.immuneAlpha = _immuneAlpha;
         drawPlayer.legFrame = _legFrame;
         drawPlayer.bodyFrame = _bodyFrame;
+        drawPlayer.wingFrame = _wingFrame;
 
         gd.SetRenderTargets(prev);
 
@@ -129,7 +132,8 @@ public class PlayerRenderTarget : ILoadable
             Main.spriteBatch.End();
             Main.spriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, matrix);
             orig(self, camera, drawPlayer, position, rotation, rotationOrigin, shadow, scale);
-        } if (drawPlayer.itemAnimation > 0)
+        } 
+        if (drawPlayer.itemAnimation > 0)
         {
             curDrawSet.ItemLocation = _itemPos;
             int count = curDrawSet.DrawDataCache.Count;
@@ -137,6 +141,23 @@ public class PlayerRenderTarget : ILoadable
             if (curDrawSet.DrawDataCache.Count == count) return; //nothing got added
             var draw = curDrawSet.DrawDataCache[^1];
             draw.color = Lighting.GetColor((int)_itemPos.X / 16, (int)_itemPos.Y / 16);
+            Main.spriteBatch.End();
+            Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
+            draw.Draw(Main.spriteBatch);
+        }
+        if (drawPlayer.wings > 0)
+        {
+            int count = curDrawSet.DrawDataCache.Count;
+            PlayerDrawLayers.DrawPlayer_09_Wings(ref curDrawSet);
+            if (curDrawSet.DrawDataCache.Count == count) return; //nothing got added
+            var draw = curDrawSet.DrawDataCache[^1];
+            var bodyParts = drawPlayer.GetModPlayer<FishPlayer>().Body.particles;
+            int partIndex = bodyParts.Count / 2 + 1;
+            var drawPos = bodyParts[^partIndex].Position;
+            var rot = drawPos.DirectionTo(bodyParts[^(partIndex + 1)].Position).ToRotation() + MathHelper.PiOver2;
+            draw.color = Lighting.GetColor((int)drawPos.X / 16, (int)drawPos.Y / 16);
+            draw.position = drawPos - Main.screenPosition;
+            draw.rotation = rot;
             Main.spriteBatch.End();
             Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
             draw.Draw(Main.spriteBatch);

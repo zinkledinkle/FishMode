@@ -10,34 +10,12 @@ namespace FishMode.Core.Physics;
 public class EntityParticle(Vector2 position, float mass, float radius) : IParticle
 {
 #nullable enable
-    #region sounds
-    private static readonly SoundStyle SplatWeak = new("FishMode/Assets/Sounds/SplatSmall", 3, SoundType.Sound)
-    {
-        Volume = 0.5f,
-        MaxInstances = 0,
-        PitchVariance = 0.5f,
-    };
-    private static readonly SoundStyle SplatMedium = new("FishMode/Assets/Sounds/SplatMedium", 3, SoundType.Sound)
-    {
-        Volume = 0.6f,
-        MaxInstances = 0,
-        PitchVariance = 0.3f,
-    };
-    private static readonly SoundStyle SplatHard = new("FishMode/Assets/Sounds/SplatHard", 3, SoundType.Sound)
-    {
-        Volume = 0.8f,
-        MaxInstances = 1,
-        PitchVariance = 0.2f,
-    };
     private static readonly SoundStyle Water = new("FishMode/Assets/Sounds/Water", 5, SoundType.Sound)
     {
         Volume = 0.4f,
         MaxInstances = 0,
         PitchVariance = 0.4f,
     };
-    private int timeSinceLastSplat = 0;
-    #endregion
-
     public Vector2 Position { get; set; } = position;
     private Vector2 oldVel;
     public Vector2 Velocity { get; set; }
@@ -59,8 +37,8 @@ public class EntityParticle(Vector2 position, float mass, float radius) : IParti
 
     private float gravity = 0.5f;
 
-    private const float maxXSpeed = 30f;
-    private const float maxYSpeed = 30f;
+    private const float maxXSpeed = 50f;
+    private const float maxYSpeed = 50f;
 
     public int touchingTileType = -1;
     public int tileX = 0;
@@ -144,7 +122,6 @@ public class EntityParticle(Vector2 position, float mass, float radius) : IParti
         }
         Grounded = false;
         suffocating = false;
-        timeSinceLastSplat++;
 
         if (Velocity.LengthSquared() > 0.1f) Frozen = false;
 
@@ -160,35 +137,16 @@ public class EntityParticle(Vector2 position, float mass, float radius) : IParti
             SoundEngine.PlaySound(Water, Position);
         Position += Velocity;
         rotation += angleVel;
+        Position = Vector2.Clamp(Position, Vector2.Zero + new Vector2(Main.offLimitBorderTiles, Main.offLimitBorderTiles) * 16, new Vector2(Main.maxTilesX - Main.offLimitBorderTiles, Main.maxTilesY - Main.offLimitBorderTiles) * 16);
     }
     public void OnHitGround(float magnitude, Vector2 normal, int surroundingSolidTiles, int tileType, int tileX, int tileY)
     {
         Grounded = true;
-        SplatNoise(magnitude);
         CollideDust(magnitude, normal);
         suffocating = surroundingSolidTiles >= 4;
         touchingTileType = tileType;
         this.tileX = tileX;
         this.tileY = tileY;
-    }
-    private void SplatNoise(float magnitude)
-    {   
-        if (magnitude < 6f) return;
-        int strength = magnitude switch
-        {
-            < 12f => 1,
-            < 22f => 2,
-            _ => 3
-        };
-        int requiredCooldown = strength * 15;
-        if (timeSinceLastSplat < requiredCooldown) return;
-        SoundStyle sound = strength switch
-        {
-            1 => SplatWeak,
-            2 => SplatMedium,
-            _ => SplatHard
-        };
-        SoundEngine.PlaySound(sound, Position);
     }
     private void CollideDust(float magnitude, Vector2 normal)
     {

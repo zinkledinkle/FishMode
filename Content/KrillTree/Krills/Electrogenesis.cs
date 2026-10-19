@@ -10,7 +10,7 @@ namespace FishMode.Content.KrillTree.Krills;
 public class Electrogenesis : Krill
 {
     public override IReadOnlyList<Type> Requirements => [typeof(Jellyfish)];
-    public override int Level => 4;
+    public override int Level => 3;
     public override Vector2 Position => new(210, 180);
     public const float radius = 350;
     public const float combinedRadius = 500;
@@ -61,7 +61,7 @@ public class Electrogenesis : Krill
     }
     public override void CombinationEffect(int otherType, Player player, ref bool deactivateOtherEffect)
     {
-        if (otherType == Jellyfish.Type) jellyfishCombined = true;
+        if (otherType == Jellyfish.ID) jellyfishCombined = true;
         deactivateOtherEffect = true;
     }
 }

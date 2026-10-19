@@ -3,12 +3,10 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Terraria;
 using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.GameContent.UI.Elements;
-using Terraria.ID;
 using Terraria.Localization;
 using Terraria.ModLoader;
 using Terraria.UI;
@@ -112,7 +110,7 @@ public class KrillPointBar : UIState
                     SoundEngine.PlaySound(NewPoint);
                     var request = new AdvancedPopupRequest()
                     {
-                        Text = Language.GetOrRegister(FishMode.Instance.GetLocalizationKey("UI.KrillPointPopup"), () => "+1 Krill Point!").Value,
+                        Text = Language.GetOrRegister(ModImpl.Instance.GetLocalizationKey("UI.KrillPointPopup"), () => "+1 Krill Point!").Value,
                         Color = Color.Cyan,
                         DurationInFrames = 120,
                         Velocity = new Vector2(0, -4f)

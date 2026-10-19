@@ -9,7 +9,7 @@ namespace FishMode.Content.KrillTree.Krills;
 public class MagicFangs : Krill
 {
     public override IReadOnlyList<Type> Requirements => [typeof(Bioluminescence)];
-    public override int Level => 3;
+    public override int Level => 2;
     public override Vector2 Position => new(120, 30);
     public override void Apply(Player player)
     {

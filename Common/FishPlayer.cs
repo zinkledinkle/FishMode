@@ -3,9 +3,9 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
+using System.Linq;
 using Terraria;
 using Terraria.GameContent;
-using Terraria.GameContent.Liquid;
 using Terraria.GameContent.Shaders;
 using Terraria.GameInput;
 using Terraria.Graphics;
@@ -33,6 +33,7 @@ public partial class FishPlayer : ModPlayer
     public bool disable = false;
 
     public bool hasWave = false;
+    private bool jumpRelease = false;
     private int wasdSineTimer;
     private float averageDir;
     private int waveTimer;
@@ -102,6 +103,7 @@ public partial class FishPlayer : ModPlayer
         {
             Body.Jump((10f + Player.jumpSpeedBoost) * 3f);
         }
+        Body.fallThroughPlatforms = triggersSet.Down || Player.grapCount > 0 || (lookDir.Y > 0.3f && triggersSet.Up);
 
         if (Keybinds.LockBind.JustReleased && MoveMode == FishModeConfig.MovementType.LookAndLock)
         {
@@ -128,8 +130,9 @@ public partial class FishPlayer : ModPlayer
         Body.Update();
 
         float countModifier = Body.particles.Count * 0.5f;
-        float moveSpeed = (2f + countModifier) * (1 + waveAccel) * ((Player.maxRunSpeed - 3f) * 2f + 1f);
-        LiquidRenderer.DEFAULT_OPACITY = [0.1f, 0.3f, 0.3f, 0.15f];
+        float runSpeed = Player.accRunSpeed * 0.5f + (Player.moveSpeed - 1f) * 5f;
+        float moveSpeed = (1f + countModifier) * (1 + waveAccel) * runSpeed;
+
         if (MoveMode == FishModeConfig.MovementType.LookAndLock)
         {
             lookDir = (Main.MouseWorld - Body.particles[0].Position).SafeNormalize(Vector2.Zero);
@@ -154,6 +157,17 @@ public partial class FishPlayer : ModPlayer
 
             Body.Propel(moveSpeed, input, 0.3f);
             WaveShit(input);
+        }
+        if (Player.grapCount == 0) return;
+        Player.GetGrapplingForces(Body.particles[0].Position, out _, out float hookX, out float hookY);
+        if (hookX == 0 || hookY == 0) return;
+        Vector2 hookVel = new(hookX, hookY);
+        Body.Propel(1f, hookVel, 0.8f, false);
+        for(int i = Player.grapCount - 1; i >= 0; i--)
+        {
+            var hook = Main.projectile[Player.grappling[i]];
+            if (Body.particles[0].Position.DistanceSQ(hook.Center) < 350)
+                hook.Kill();
         }
     }
     private void WaveShit(Vector2 dir)
@@ -188,7 +202,7 @@ public partial class FishPlayer : ModPlayer
         if (disable || Player.dead) return;
 
         Vector2 fishPos = Body.particles[0].Position;
-        Player.Center = fishPos;
+        Player.MountedCenter = fishPos;
         Player.velocity = Body.particles[0].Velocity;
         if (Main.WaveQuality > 0)
         {
@@ -197,7 +211,10 @@ public partial class FishPlayer : ModPlayer
         }
 
         if (Math.Abs(Body.particles[0].Velocity.X) > 1) Player.direction = Math.Sign(Body.particles[0].Velocity.X);
+        jumpRelease = Player.controlJump;
     }
+    public override void OnHitByNPC(NPC npc, Player.HurtInfo hurtInfo) { if (!Player.noKnockback) Body.Knockback(npc, hurtInfo.Knockback); }
+    public override void OnHitByProjectile(Projectile proj, Player.HurtInfo hurtInfo) { if (!Player.noKnockback) Body.Knockback(proj, hurtInfo.Knockback); }
     public override void DrawPlayer(Camera camera)
     {
         if (!ModContent.GetInstance<FishModeConfig>().DebugDraw) return;

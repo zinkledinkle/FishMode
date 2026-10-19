@@ -1,8 +1,10 @@
+using FishMode.Common.VanillaAccessoryChanges;
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;
 using System;
 using System.Linq;
+using System.Reflection;
 using Terraria;
 using Terraria.Audio;
 using Terraria.DataStructures;
@@ -47,8 +49,40 @@ public partial class FishPlayer : ModPlayer
             if (type == BuffID.Shimmer) return;
             orig(self, type, time, fromnet);
         };
+        On_Player.Update += static (orig, self, i) =>
+        {
+            self.statLife = 99999;
+            var fplr = self.GetModPlayer<FishPlayer>();
+            if (!fplr.disable)
+                if (fplr.Body.Submerged || fplr.Body.Grounded) self.wingTime = self.wingTimeMax;
+            orig(self, i);
+        };
+        On_Player.StopExtraJumpInProgress += static (orig, self) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self); };
+        On_Player.WingMovement += static (orig, self) =>
+        {
+            var stats = self.GetWingStats(self.wingsLogic);
+            var horizontalSpeed = Math.Max(stats.AccRunSpeedOverride, self.accRunSpeed);
+            var upAccel = 1f;
+            float _ = 0f;
+            ItemLoader.VerticalWingSpeeds(self, ref _, ref upAccel, ref _, ref upAccel, ref _);
+            upAccel *= 5;
+
+            float angleMod = MathHelper.WrapAngle(self.GetModPlayer<FishPlayer>().lookDir.ToRotation() + MathHelper.PiOver2);
+            angleMod = MathHelper.Clamp(angleMod, -MathHelper.PiOver2, MathHelper.PiOver2);
+            var dir = -Vector2.UnitY.RotatedBy(angleMod);
+            dir.X *= 0.1f * horizontalSpeed;
+            if (self.GetModPlayer<FishPlayer>().Body.Submerged) return;
+            self.GetModPlayer<FishPlayer>().Body.Propel(upAccel, dir, 0.9f, false);
+            self.wingTime--;
+        };
         On_Player.HorizontalMovement += static (orig, self) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self); };
-        On_Player.JumpMovement += static (orig, self) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self); };
+        On_Player.JumpMovement += static (orig, self) => 
+        { 
+            if (self.GetModPlayer<FishPlayer>().disable) 
+                orig(self); 
+            else if (self.controlDash && self.releaseDash && !self.blockExtraJumps) 
+                ExtraJumpLoader.ProcessJumps(self);
+        };
         On_Player.DryCollision += (orig, self, fallthrough, ignorePlats) => { if (self.GetModPlayer<FishPlayer>().disable) orig(self, fallthrough, ignorePlats); };
         On_Player.CheckDrowning += DrownOverride;
 
@@ -120,12 +154,14 @@ public partial class FishPlayer : ModPlayer
     private void UpdateStuff(ILContext il)
     {
         var c = new ILCursor(il);
+        var c2 = c.Clone();
 
-        var hurtTileMethod = typeof(Player).GetMethod(nameof(Player.GetHurtTile));
+        //hurttile things
+        var hurtTileMethod = typeof(Player).GetMethod(nameof(Player.GetHurtTile), BindingFlags.NonPublic | BindingFlags.Instance);
         if (hurtTileMethod == null) return;
         if (!c.TryGotoNext(i => i.MatchCall(hurtTileMethod))) return;
         c.Index--;
-        c.RemoveRange(15);
+        c.RemoveRange(35);
 
         c.EmitLdarg0(); //player
         c.EmitDelegate((Player self) =>
@@ -138,6 +174,16 @@ public partial class FishPlayer : ModPlayer
                 self.ApplyTouchDamage(particle.touchingTileType, particle.tileX, particle.tileY);
             }
         });
+
+        //wings
+        var wingMovementMethod = typeof(Player).GetMethod(nameof(Player.WingMovement), BindingFlags.Public | BindingFlags.Instance);
+        if (wingMovementMethod == null) return;
+        if (!c2.TryGotoNext(i => i.MatchCall(wingMovementMethod))) return;
+        var jumpField = typeof(Player).GetField(nameof(Player.jump), BindingFlags.Public | BindingFlags.Instance);
+        if (jumpField == null) return;
+        if (!c2.TryGotoPrev(i => i.MatchLdfld(jumpField))) return;
+        c2.Index--;
+        c2.RemoveRange(3);
     }
     private void UsestyleFix(ILContext il)
     {

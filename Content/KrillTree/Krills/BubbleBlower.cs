@@ -8,9 +8,9 @@ namespace FishMode.Content.KrillTree.Krills;
 
 public class BubbleBlower : Krill
 {
-    private const int bubbleDamage = 6;
+    private const int bubbleDamage = 8;
     private const float bubbleKnockback = 1.4f;
-    public override int Level => 2;
+    public override int Level => 1;
     public override Vector2 Position => new(60, -60);
     public override void Apply(Player player)
     {
@@ -20,7 +20,7 @@ public class BubbleBlower : Krill
     {
         public bool enabled = false;
         private int time = 0;
-        private const int timeMax = 16;
+        private const int timeMax = 5;
         public override void ResetEffects()
         {
             enabled = false;
@@ -31,6 +31,7 @@ public class BubbleBlower : Krill
             On_Projectile.NewProjectile_IEntitySource_float_float_float_float_int_int_float_int_float_float_float_NewProjectileModifier += static (orig, spawnSource, X, Y, SpeedX, SpeedY, Type, Damage, KnockBack, Owner, ai0, ai1, ai2, mod) =>
             {
                 int result = orig(spawnSource, X, Y, SpeedX, SpeedY, Type, Damage, KnockBack, Owner, ai0, ai1, ai2, mod);
+                if (Type == BubbleBombardierProjectile.ID) return result;
                 var player = Main.player[Owner];
                 if (Main.projectile[result].DamageType == DamageClass.Ranged && player.active && !player.dead && player.GetModPlayer<BubbleBlower_Player>().enabled && player.GetModPlayer<BubbleBlower_Player>().time == 0)
                 {

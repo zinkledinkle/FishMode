@@ -63,19 +63,18 @@ float4 Main(VertexShaderOutput input) : COLOR0
         return float4(0, 0, 0, 0);
     }
 
-    float blurRange = 0.4f / uZoom;
-    float blurFactor = saturate((blurRange - distance) / blurRange);
+    float blurFactor = saturate(1 - distance);
     
     float2 tx = 1 / uVeinSize.xy;
 
     float2 waveCoords = coords - float2(uTime * 0.08f, uTime * 0.06f / distance);
     waveCoords.y /= 2 * distance;
-    float4 waves = sampleBlur(uImage2, frac(waveCoords / 2), 5 * blurFactor, tx);
+    float4 waves = sampleBlur(uImage2, frac(waveCoords / 2), 4 * blurFactor, tx);
     
     float2 veinCoords = coords + float2(uTime * 0.1f, uTime * 0.03f / distance);
     veinCoords += waves.r * 0.5f;
-    float4 vein = sampleBlur(uImage1, frac(veinCoords / 6), 200 * blurFactor, tx);
-    vein.rgb = float3(0.3f, 0.9f, 0.4f) * vein.r;  
+    float4 vein = sampleBlur(uImage1, frac(veinCoords / 6), 4 * blurFactor, tx);
+    vein.rgb = float3(0.4f, 0.9f, 0.5f) * vein.r;  
     color += vein;
     
     color.rgb *= (saturate(distance) * 0.75f + 0.25f);
@@ -85,7 +84,7 @@ float4 Main(VertexShaderOutput input) : COLOR0
     sunShine = pow(sunShine, 1.8f);
     sunShine *= distance;
     float veinLuminosity = (vein.r + vein.g + vein.b) / 3;
-    color += sunShine * float4(0.9f, 0.8f, 0.2f, 1) * veinLuminosity * 3;
+    color += sunShine * float4(0.5f, 0.7f, 0.5f, 1) * veinLuminosity * 3;
     
     int steps = 6;
     color = floor(color * steps) / (steps - 1);

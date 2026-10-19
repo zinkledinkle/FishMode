@@ -146,8 +146,8 @@ public class KrillTreeUI : UIState
         Append(panel);
 
         selected = new UIPanel();
-        selected.Width.Set(272 * 2, 0f);
-        selected.Height.Set(64 * 2, 0f);
+        selected.Width.Set(568, 0f);
+        selected.Height.Set(142, 0f);
         selected.HAlign = 0.5f;
         selected.VAlign = 1f;
         selected.BackgroundColor = selected.BorderColor = Color.Transparent;
@@ -218,8 +218,8 @@ public class KrillTreeUI : UIState
         var level = KrillTree.Krills[node.ID].Level;
         if (node.unlocked)
         {
-            node.activated = !node.activated;
             PlayerTree.Toggle(node.ID);
+            node.activated = PlayerTree.IsActivated(node.ID);
             foreach (var toDeactivate in nodes.Where(n => KrillTree.Krills[n.ID].Level == level && n.ID != node.ID))
                 toDeactivate.activated = false;
             node.scale = 0.9f;
@@ -312,19 +312,28 @@ public class KrillTreeUI : UIState
             return;
         var rect = selected.GetDimensions().ToRectangle();
         var selectedTexture = Assets.Textures.UI.Selected.Asset.Value;
+        var shadow = Assets.Textures.UI.Selected_shadow.Asset.Value;
         var line = Assets.Textures.UI.Line.Asset.Value;
         var comboBorder = Assets.Textures.UI.CombinationBorder.Asset.Value;
         Vector2 comboBorderOrigin = comboBorder.Size() / 2f;
 
-        spriteBatch.Draw(selectedTexture, rect, null, Color.White);
+        float barRot = MathF.Sin((float)Main.timeForVisualEffects * 0.02f) * 0.015f;
+        float yOff = MathF.Sin((float)Main.timeForVisualEffects * 0.016f) * 4f;
+        var barPos = rect.Center();
+        barPos.Y += yOff;
+        rect.Y += (int)yOff;
 
-        Vector2 firstSlot = new Vector2(31.5f, 28f) * 2 + rect.TopLeft();
+        spriteBatch.Draw(shadow, barPos, null, Color.White, barRot, shadow.Size()/2f, 1f, SpriteEffects.None, 0f);
+        spriteBatch.Draw(selectedTexture, barPos, null, Color.White, barRot, rect.Size()/2f, 1f, SpriteEffects.None, 0f);
+
+        Vector2 firstSlot = new Vector2(87f, 58f) + rect.TopLeft().RotatedBy(barRot, rect.Center());
+        Vector2 slotOffset = Vector2.UnitX.RotatedBy(barRot) * 103f;
 
         int flipComboConnections = 1;
         float height = 30f;
         for(int i = 0; i < 5; i++)
         {
-            var pos = firstSlot + Vector2.UnitX * i * 52 * 2;
+            var pos = firstSlot + slotOffset * i;
             int krillID = PlayerTree.activated[i];
             if (krillID == -1) continue;
             var krill = KrillTree.Krills[krillID];
@@ -339,7 +348,7 @@ public class KrillTreeUI : UIState
             foreach(var combination in combinationIndices)
             {
                 if (combination > i) continue;
-                var otherPos = firstSlot + Vector2.UnitX * combination * 52 * 2;
+                var otherPos = firstSlot + slotOffset * combination;
                 float dist = otherPos.Distance(pos);
                 Vector2 center = (otherPos + pos) / 2f;
                 int arcResolution = (int)(dist / 10f);
@@ -370,7 +379,7 @@ public class KrillTreeUI : UIState
         }
         for (int i = 0; i < 5; i++)
         {
-            var pos = firstSlot + Vector2.UnitX * i * 52 * 2;
+            var pos = firstSlot + slotOffset * i;
             int krillID = PlayerTree.activated[i];
             if (krillID == -1) continue;
             var krill = KrillTree.Krills[krillID];
@@ -382,7 +391,7 @@ public class KrillTreeUI : UIState
             if (hovering)
             {
                 hoverName = krill.DisplayName.Value;
-                hoverTooltip = krill.Tooltip.Value;
+                hoverTooltip = KrillTree.AtGameStageForKrill(krill.Level) ? krill.Tooltip.Value : ModImpl.Instance.GetLocalization($"UI.{krill.Level}StarLocked").Value;
                 hoverLevel = krill.Level;
                 HoveringNodeIndex = -10 + i;
             }
@@ -482,7 +491,7 @@ public class KrillTreeUI : UIState
 
         var bar = Assets.Textures.UI.TitleBar.Asset.Value;
         var gradient = Assets.Textures.UI.Gradient.Asset.Value;
-        int gradientHeight = 150 + hoverCombos.Count * 100;
+        int gradientHeight = 150 + (KrillTree.AtGameStageForKrill(hoverLevel) ? hoverCombos.Count : 0) * 100;
 
         var gradientRect = rect;
         gradientRect.Y += leftEdge.Height;
@@ -516,10 +525,10 @@ public class KrillTreeUI : UIState
         var tooltipPos = untransformedTextPos + new Vector2(-8, 40);
         ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, tooltip, tooltipPos, Color.White * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
 
-        if (hoverCombos.Count > 0)
+        if (hoverCombos.Count > 0 && KrillTree.AtGameStageForKrill(hoverLevel))
         {
             var combinesWithPos = tooltipPos + Vector2.UnitY * (font2.MeasureString(tooltip).Y + 16f);
-            var combinesWithText = FishMode.Instance.GetLocalization("UI.CombinesWithText").Value;
+            var combinesWithText = ModImpl.Instance.GetLocalization("UI.CombinesWithText").Value;
             ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, combinesWithText, combinesWithPos, Color.Gray * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
 
             var comboPos = combinesWithPos + Vector2.UnitX * (font2.MeasureString(combinesWithText).X + 16f);
@@ -575,7 +584,7 @@ public class KrillTreeUI : UIState
         var vein = Assets.Textures.Noise.Vein.Asset.Value;
         var shader = Assets.Effects.UIOceanShader.Asset.Value;
 
-        var color = new Color(0.2f, 0.02f, 0.6f);
+        var color = new Color(0.15f, 0.05f, 0.6f);
 
         spriteBatch.graphicsDevice.Textures[1] = vein;
         spriteBatch.graphicsDevice.Textures[2] = perlin;
@@ -620,7 +629,8 @@ public class KrillNode(int id, Vector2 position)
             Vector2 midPoint = (otherPos + pos) / 2f;
             float lineRot = (otherPos - pos).ToRotation() + MathHelper.PiOver2;
 
-            if (unlocked && !Main.LocalPlayer.GetModPlayer<KrillTreePlayer>().KrillTree.Unlocked.Contains(unlockID))
+            var krillTree = Main.LocalPlayer.GetModPlayer<KrillTreePlayer>().KrillTree;
+            if (unlocked && krillTree.CanUnlock(unlockID))
             {
                 float alpha = MathF.Sin((float)Main.timeForVisualEffects / MathHelper.TwoPi / 2f) * 0.25f + 0.75f;
 
@@ -665,7 +675,7 @@ public class KrillNode(int id, Vector2 position)
         {
             KrillTreeUI.HoveringNodeIndex = ID;
             KrillTreeUI.hoverName = krill.DisplayName.Value;
-            KrillTreeUI.hoverTooltip = krill.Tooltip.Value;
+            KrillTreeUI.hoverTooltip = KrillTree.AtGameStageForKrill(krill.Level) ? krill.Tooltip.Value : ModImpl.Instance.GetLocalization($"UI.{krill.Level}StarLocked").Value;
             KrillTreeUI.hoverLevel = krill.Level;
             KrillTreeUI.hoverCombos.AddRange(krill.Combinations);
             hovering = true;

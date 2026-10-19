@@ -1,111 +1,59 @@
-sampler2D uImage0 : register(s0);
-sampler2D uImage1 : register(s1);
+sampler2D uBubbleTarget : register(s0);
+sampler2D uScreenTarget : register(s1);
+sampler2D uNoiseTexture : register(s2);
 
 float uTime;
 float2 uResolution;
 float2 uScreenPos;
 float2 uZoom;
 
-cbuffer BubbleBuffer : register(b0)
-{
-    uniform float3 uBubbles[128];
-}
-uint uBubbleCount;
-
-struct VertexShaderOutput
-{
-    float4 Position : POSITION0;
-    float4 Color : COLOR0;
-    float2 TexCoord : TEXCOORD0;
-};
-
-//normalized 0-1 to closest bubble
-float Field(float2 p, float threshold, out float2 normal)
-{
-    float result = 0;
-    normal = float2(0, 0);
-    float2 delta = float2(0, 0);
-    float eps = 1e-6;
-    //why the fuck does it not want to iterate over 128 but its totally okay with 64 twice
-    [loop]
-    for (uint i = 0; i < 64; i++)
-    {
-        if (i > uBubbleCount)
-            break;
-        delta = p - uBubbles[i].xy;
-        float r = uBubbles[i].z;
-        float dist = length(delta);
-        float threshRadius = r / sqrt(max(threshold, eps));
-        float n = saturate(1 - dist / threshRadius);
-        result = max(result, n);
-        normal += delta * n;
-    }
-    if (uBubbleCount > 64)
-    {
-        [loop]
-        for (uint j = 64; j < 128; j++)
-        {
-            if (j > uBubbleCount)
-                break;
-            delta = p - uBubbles[j].xy;
-            float r = uBubbles[j].z;
-            float dist = length(delta);
-            float threshRadius = r / sqrt(max(threshold, eps));
-            float n = saturate(1 - dist / threshRadius);
-            result = max(result, n);
-            normal += delta * n;
-        }
-    }
-    normal = normalize(-normal);
-    return result;
-}
-
-float4 Main(VertexShaderOutput input) : COLOR0
-{
-    float2 coords = input.TexCoord;
+float4 Main(float2 coords : TEXCOORD0) : COLOR0
+{    
+    coords = floor((coords * uResolution / uZoom) / 2) / uResolution * uZoom * 2;
+    float4 bubbleData = tex2D(uBubbleTarget, coords);
+    float2 normal = normalize((bubbleData.rg - float2(0.5f, 0.5f)) * 2);
+    float value = bubbleData.a;
+    if (value <= 0)
+        return float4(0, 0, 0, 0);
+    float radius = bubbleData.b * 256;
     
-    float2 worldPos = (coords - float2(0.5f, 0.5f)) / uZoom + float2(0.5f, 0.5f);
-    worldPos *= uResolution;
-    worldPos += uScreenPos;
-    //worldPos = floor(worldPos / 2) * 2;
-    float2 normal;
-    float threshold = 0.9f;
-    float value = Field(worldPos, threshold, normal);
-    float invValue = value > 0 ? (1 - value) : 0;
+    float rimWidth = 9.f;
+    float rim = saturate(1 - value * radius / rimWidth);
+    rim = pow(rim, 10);
     
-    float2 noiseCoords = worldPos / uResolution;
-    noiseCoords += float2(uTime * 0.01f, uTime * 0.02f);
-    float4 noise = tex2D(uImage1, frac(noiseCoords * 16));
+    float2 noiseCoords = coords / (uResolution.x / uResolution.y) / uZoom * 10;
+    noiseCoords = frac(noiseCoords + float2(uTime * 0.1f, uTime * 0.2f));
+    float4 noise = tex2D(uNoiseTexture, noiseCoords);
     
-    value -= noise.r * 0.2f;
+    normal += noise.r * 2.f - 1.f;
+    coords -= normal * pow(value, 0.1f) / uResolution * radius * 0.2f;
     
-    float2 viewDir = float2(0, 1);
-    viewDir.x += sin(uTime * 0.05f) * 0.1f;
-    float f = saturate(1 - dot(viewDir, normal));
-    float fauxFresnel = pow(f, 3);
+    float pxOffset = 4;
+    float cR = tex2D(uScreenTarget, coords + normal * (1 - value) / uResolution * pxOffset).r;
+    float cG = tex2D(uScreenTarget, coords).g;
+    float cB = tex2D(uScreenTarget, coords - normal * (1 - value) / uResolution * pxOffset).b;
+   
     
-    float2 lightDir = float2(-1, -1);
-    float highlight = saturate(dot(normal, -lightDir));
-    highlight *= (noise.r * 0.2f + 0.9f);
-    highlight = pow(highlight, 9);
-    float backlight = saturate(dot(normal, lightDir));
-    backlight = pow(backlight, 0.7f);
-    backlight *= (noise.r * 0.2f + 0.9f);
+    float4 color = float4(cR, cG, cB, tex2D(uScreenTarget, coords).a);
+    rim += noise * (1 - value) * 0.2f;
+    color += rim * 0.5f;
     
-    float rim = pow(invValue, 4);
+    float2 lightingCoords = bubbleData.rg + noise.r * 0.05f;
+    float lighting = saturate(1 - distance(lightingCoords, float2(0.5f, 0.f)) * 2);
+    float sideLighting = abs(bubbleData.r - 0.5f) * 2;
+    sideLighting *= bubbleData.g;
+    sideLighting = pow(sideLighting, 2);
+    lighting += sideLighting;
+    color += lighting * float4(1.f, 0.9f, 0.5f, 1.f);
     
-    float pxOffset = 10;
-    float cR = tex2D(uImage0, coords + normal * rim / uResolution * pxOffset).r;
-    float cG = tex2D(uImage0, coords).g;
-    float cB = tex2D(uImage0, coords - normal * rim / uResolution * pxOffset).b;
-
-    coords += normal / uResolution * value * 200;
+    float shading = saturate(distance(lightingCoords, float2(0.5f, 0.66f)) * 2);
+    shading = pow(shading, 0.6f);
+    shading = max(shading, 0.5f);
+    float3 shadowColor = float3(0.2f, 0.1f, 0.5f);
+    color.rgb = lerp(color.rgb, shadowColor, 1 - shading);
     
-    float4 color = float4(cR, cG, cB, tex2D(uImage0, coords).a);
-    color += rim;
-    color += float4(0.5f, 1, 0.5f, 1) * fauxFresnel * invValue * 0.4f;
-    color += noise.r * float4(1, 0.6f, 0.3f, 1) * highlight * invValue * 0.35f;
-    color += noise.r * float4(0.3f, 0.6f, 1, 1) * backlight * invValue * 0.35f;
+    int steps = 12;
+    color = floor(color * steps) / (steps - 1);
 
     return color;
 }

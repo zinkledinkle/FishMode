@@ -1,17 +1,74 @@
-﻿<Project Sdk="Tomat.Terraria.ModLoader.Sdk/2.1.1">
+﻿<Project Sdk="Tomat.Terraria.ModLoader.Sdk">
 
 	<PropertyGroup>
+		<TmlBuildUseDefaultModImpl>true</TmlBuildUseDefaultModImpl>
 		<TargetFramework>net10.0</TargetFramework>
 		<TmlVersion>dev</TmlVersion>
 		<TmlBuildBootstrapFeatures>tomat.environmentmodlist;tomat.enablemod;lolxd87.splashskip;tomat.assethotreloading</TmlBuildBootstrapFeatures>
 	</PropertyGroup>
 	
 	<ItemGroup>
-		<Publicize Include="tModLoader;ReLogic;FNA" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
+		<Publicize Include="tModLoader;ReLogic;FNA;DragonLens" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
 	</ItemGroup>
 
 	<ItemGroup>
 	  <Folder Include="Properties\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include=".github\copilot-instructions.md" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\daybreak-mod\src\Daybreak.CodeAnalysis\Daybreak.CodeAnalysis.csproj" PrivateAssets="All" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="Daybreak">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.ChatTags.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.ChatTags.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Contracts.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Contracts.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.EarlyLoader.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.EarlyLoader.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Hooks.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Hooks.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Mathematics.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Mathematics.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Models.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Models.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.MonoMod.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.MonoMod.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Networking.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Networking.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Rendering.Buffers.Entities.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Rendering.Buffers.Entities.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Rendering.Buffers.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Rendering.Buffers.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Rendering.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Rendering.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.Resources.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.Resources.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Daybreak.UI.V1">
+	    <HintPath>..\daybreak-mod\src\Daybreak\bin\Debug\net10.0\Daybreak.UI.V1.dll</HintPath>
+	  </Reference>
+	  <Reference Include="DragonLens">
+	    <HintPath>..\DragonLens\bin\Debug\net10.0\DragonLens.dll</HintPath>
+	  </Reference>
 	</ItemGroup>
 	
 </Project>

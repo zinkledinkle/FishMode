@@ -1,10 +1,13 @@
 using Microsoft.Xna.Framework;
 using MonoMod.Cil;
+using System.Reflection;
+using Terraria;
 using Terraria.GameContent.Liquid;
 using Terraria.Graphics.Light;
+using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace FishMode.Common;
+namespace FishMode.Common.VanillaChanges;
 
 public class ClearLiquids : ILoadable
 {
@@ -22,9 +25,31 @@ public class ClearLiquids : ILoadable
         {
             var c = new ILCursor(il);
             c.GotoNext(i => i.MatchLdcR4(0.175f));
-            //c.Next.Operand = waterLightDecay;
-            c.Remove();
-            c.EmitDelegate(() => waterLightDecay);
+            c.Next.Operand = waterLightDecay;
+        };
+        IL_WaterfallManager.DrawWaterfall_int_float += static (il) =>
+        {
+            var c = new ILCursor(il);
+            var waterfallsArray = typeof(WaterfallManager).GetField("waterfalls", BindingFlags.NonPublic | BindingFlags.Instance);
+            var waterfallData = typeof(WaterfallManager.WaterfallData);
+            var waterfallType = waterfallData.GetField("type", BindingFlags.Public | BindingFlags.Instance);
+
+            c.GotoNext(i => i.MatchLdarg0());
+            c.EmitLdarg0();
+            c.EmitLdfld(waterfallsArray);
+            c.EmitLdloc(10);
+            c.EmitLdarga(2);
+            c.EmitDelegate((WaterfallManager.WaterfallData[] data, int i, ref float alpha) =>
+            {
+                alpha *= (data[i].type switch
+                {
+                    LiquidID.Water => waterOpacity,
+                    LiquidID.Honey => honeyOpacity,
+                    LiquidID.Lava => lavaOpacity,
+                    LiquidID.Shimmer => shimmerOpacity,
+                    _ => 1f,
+                } + backGroundOpacity);
+            });
         };
         LiquidRenderer.DEFAULT_OPACITY = [waterOpacity, lavaOpacity, honeyOpacity, shimmerOpacity];
         On_LiquidRenderer.DrawNormalLiquids += static (orig, self, sb, off, style, alpha, bg, waterOnly) =>

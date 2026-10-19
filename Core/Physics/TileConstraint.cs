@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Terraria;
-using Terraria.Graphics.Renderers;
+using Terraria.ID;
 
 namespace FishMode.Core.Physics;
 
@@ -16,6 +16,7 @@ public class TileConstraint(IParticle particle) : IConstraint
     /// </summary>
     public event Action<IParticle, float, Vector2, int, int, int, int> TileCollision = delegate { };
     private int totalSurroundingTiles = 0;
+    public bool passThroughPlatforms = false;
     public void Solve()
     {
         totalSurroundingTiles = 0;
@@ -36,7 +37,8 @@ public class TileConstraint(IParticle particle) : IConstraint
             {
                 Tile tile = Main.tile[x, y];
                 bool solid = Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType];
-                if (!tile.HasTile || !solid) continue;
+                bool platform = TileID.Sets.Platforms[tile.TileType] && y * 16 > Particle.Position.Y && !passThroughPlatforms;
+                if ((!tile.HasTile || !solid) && !platform) continue;
 
                 int xDiff = Math.Abs(x - tileX);
                 int yDiff = Math.Abs(y - tileY);

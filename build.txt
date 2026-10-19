@@ -1,3 +1,6 @@
 displayName = Fish Mode
 author = Zinkle
 version = 0.1
+modReferences = Daybreak
+weakReferences = DragonLens@1.11.1
+sortAfter = DragonLens

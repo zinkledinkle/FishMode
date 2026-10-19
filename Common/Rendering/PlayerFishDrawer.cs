@@ -1,4 +1,5 @@
 using FishMode.Common;
+using FishMode.Core.Drawing;
 using FishMode.Core.Physics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -9,7 +10,7 @@ using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 
-namespace FishMode.Core.Drawing;
+namespace FishMode.Common.Rendering;
 
 public class PlayerFishDrawer : ILoadable
 {
@@ -88,10 +89,13 @@ public class PlayerFishDrawer : ILoadable
             var points = particles.Select(p => p.Position).ToList();
             var source = PlayerRenderTarget.GetPlayerSource(player.whoAmI);
 
-            points.Insert(0, points[0] - (points[1] - points[0]));
-            points.Insert(0, points[0] - (points[1] - points[0]));
-            points.Add(points[^1] + (points[^1] - points[^2]));
-            points.Add(points[^1] + (points[^1] - points[^2]));
+            if (!player.dead)
+            {
+                points.Insert(0, points[0] - (points[1] - points[0]));
+                points.Insert(0, points[0] - (points[1] - points[0]));
+                points.Add(points[^1] + (points[^1] - points[^2]));
+                points.Add(points[^1] + (points[^1] - points[^2]));
+            }
 
             float width = source.Width;
             float height = source.Height;

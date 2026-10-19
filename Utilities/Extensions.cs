@@ -46,6 +46,7 @@ public static class Extensions
             ModDust d => d.Type,
             ModEmoteBubble e => e.Type,
             ModMount mo => mo.Type,
+            Krill k => k._id,
             _ => -1
         };
     }
@@ -56,10 +57,6 @@ public static class Extensions
     extension<T>(T) where T : class
     {
         public static T? Instance => ModContent.GetInstance<T>();
-    }
-    extension<T>(T) where T : Krill
-    {
-        public static int Type => KrillTree.Krills.FirstOrDefault(k => k.Value.GetType() == typeof(T)).Key;
     }
     extension(Rectangle rect)
     {

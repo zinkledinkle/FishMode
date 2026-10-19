@@ -5,9 +5,9 @@ using Terraria;
 
 namespace FishMode.Content.KrillTree.Krills;
 
-internal class ArmoredScales : Krill
+public class ArmoredScales : Krill
 {
-    public override int Level => 2;
+    public override int Level => 1;
     public override Vector2 Position => new(-120, 90);
     public override IReadOnlyList<Type> Requirements => [typeof(Swordfish)];
     public override void Apply(Player player)

@@ -10,7 +10,7 @@ namespace FishMode.Content.KrillTree.Krills;
 public class Jellyfish : Krill
 {
     public override IReadOnlyList<Type> Requirements => [typeof(MagicFangs)];
-    public override int Level => 3;
+    public override int Level => 2;
     public override Vector2 Position => new(150, 150);
     public const float radius = 200;
     private const int targetDPS = 20;

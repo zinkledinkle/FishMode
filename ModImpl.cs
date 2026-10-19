@@ -3,7 +3,6 @@ using MonoMod.Cil;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
-using Terraria;
 using Terraria.GameInput;
 using Terraria.ModLoader;
 using Terraria.ModLoader.Config;
@@ -12,7 +11,7 @@ using Terraria.ModLoader.UI;
 
 namespace FishMode;
 
-public class FishMode : Mod
+partial class ModImpl
 {
     public override void Load()
     {
@@ -59,8 +58,11 @@ public class FishModeConfig : ModConfig
     [Cycle]
     [DefaultValue(MovementType.LookAndLock)]
     public MovementType MovementMode {  get; set; }
-    [DefaultValue(true)]
-    public bool ScreenShake { get; set; }
+    [Header("CrossMod")]
+    [JITWhenModsEnabled("DragonLens")]
+    [DefaultValue(false)]
+    public bool DragonLensPixelateRadialHitboxes { get; set; }
+
 
     [Header("Experimental")]
 

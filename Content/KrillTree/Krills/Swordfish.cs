@@ -6,7 +6,7 @@ using Terraria.ModLoader;
 namespace FishMode.Content.KrillTree.Krills;
 public class Swordfish : Krill
 {
-    public override int Level => 2;
+    public override int Level => 1;
     public override Vector2 Position => new(-60, 60);
     public override void Apply(Player player)
     {

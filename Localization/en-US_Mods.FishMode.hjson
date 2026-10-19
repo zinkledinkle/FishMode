@@ -22,11 +22,18 @@ Configs: {
 			Tooltip: Changes how the core movement works
 		}
 
-		Headers.Experimental: Experimental
+		Headers: {
+			Experimental: Experimental
+			CrossMod: Cross-Mod
+		}
 
-		ScreenShake: {
-			Label: Screen Shake
-			Tooltip: ""
+		DragonLensPixelateRadialHitboxes: {
+			Label: DragonLens Pixelate Radial Hitboxes
+			Tooltip: 
+				'''
+				Whether or not to apply a pixelation effect to radial hitboxes when visualized in DragonLens.
+				it kinda looks like ass and I'm too lazy to come up with a better pixelation method
+				'''
 		}
 	}
 
@@ -83,7 +90,21 @@ Krills: {
 
 	BubbleBlower: {
 		DisplayName: Bubble Blower
-		Tooltip: Ranged attacks spawn small bubbles
+		Tooltip: Ranged strikes spawn small bubbles that deal 8 ranged damage (Limited to 12 bubbles per second)
+	}
+
+	BubbleBlaster: {
+		DisplayName: Bubble Blaster
+		Tooltip: Every 5th ranged projectile is encased in a damaging bubble that deals 20 ranged damage
+	}
+
+	BubbleBombardier: {
+		DisplayName: Bubble Bombardier
+		Tooltip:
+			'''
+			Ranged strikes have a 1 in 3 chance to spawn a damaging bubble that explodes on contact
+			The bubble deals 25% of the original strikes damage + 15 ranged damage
+			'''
 	}
 
 	Electrogenesis: {
@@ -109,7 +130,7 @@ Krills: {
 
 	Quickfins: {
 		DisplayName: Quickfins
-		Tooltip: +10% movement speed
+		Tooltip: +20% movement speed
 	}
 
 	Radiance: {
@@ -128,7 +149,11 @@ Keybinds: {
 	OpenKrillTree.DisplayName: Open Krill Tree
 }
 
-Projectiles.SmallBubbleProjectile.DisplayName: Small Bubble Projectile
+Projectiles: {
+	SmallBubbleProjectile.DisplayName: Small Bubble Projectile
+	BubbleBlasterProjectile.DisplayName: Bubble Blaster Projectile
+	BubbleBombardierProjectile.DisplayName: Bubble Bombardier Projectile
+}
 
 Buffs: {
 	Electrified_NPC: {
@@ -140,4 +165,8 @@ Buffs: {
 UI: {
 	KrillPointPopup: +1 Krill Point!
 	CombinesWithText: Combines With:
+	2StarLocked: Must defeat a boss before obtaining 2 star Krills!
+	3StarLocked: Must defeat Skeletron before obtaining 3 star Krills!
+	4StarLocked: Must defeat a Mechanical Boss before obtaining 4 star Krills!
+	5StarLocked: Must defeat Golem before obtaining 5 star Krills!
 }

@@ -29,7 +29,7 @@ Configs: {
 
 		DragonLensPixelateRadialHitboxes: {
 			Label: DragonLens Pixelate Radial Hitboxes
-			Tooltip: 
+			Tooltip:
 				'''
 				Whether or not to apply a pixelation effect to radial hitboxes when visualized in DragonLens.
 				it kinda looks like ass and I'm too lazy to come up with a better pixelation method

@@ -10,7 +10,7 @@ using Terraria.ID;
 using Terraria.Audio;
 using Terraria.GameContent.Drawing;
 
-namespace FishMode.Common.VanillaChanges.VanillaAccessoryChanges;
+namespace FishMode.Common.VanillaChanges.VanillaChanges.Accessories;
 
 public class ExtraJumpDashes : ModPlayer
 {

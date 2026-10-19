@@ -1,3 +1,4 @@
+using Daybreak.Rendering.V1;
 using FishMode.Common;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -17,9 +18,9 @@ namespace FishMode.UI;
 
 public class KrillPointBarSystem : ModSystem
 {
-    private UserInterface uInterface;
-    private KrillPointBar uiState;
-    private GameTime _gameTime;
+    private UserInterface? uInterface;
+    private KrillPointBarState? uiState;
+    private GameTime? _gameTime;
     public override void Load()
     {
         if (Main.dedServ) return;
@@ -30,7 +31,7 @@ public class KrillPointBarSystem : ModSystem
     public override void UpdateUI(GameTime gameTime)
     {
         _gameTime = gameTime;
-        uInterface.Update(gameTime);
+        uInterface?.Update(gameTime);
         base.UpdateUI(gameTime);
     }
     public override void ModifyInterfaceLayers(List<GameInterfaceLayer> layers)
@@ -39,31 +40,98 @@ public class KrillPointBarSystem : ModSystem
         if (index == -1) return;
         layers.Insert(index, new LegacyGameInterfaceLayer("KrillPointBarSystem", () =>
         {
-            uInterface.Draw(Main.spriteBatch, _gameTime);
+            uInterface?.Draw(Main.spriteBatch, _gameTime);
             return true;
         }, InterfaceScaleType.UI));
     }
-    public void GetPoints(float amount, Vector2 position) => uiState.SpawnParticles(amount, position);
+    public void GetPoints(float amount, Vector2 position) => uiState?.SpawnParticles(amount, position);
 }
-public class KrillPointBar : UIState
+public class KrillPointBar : UIElement
+{
+    private GameTime? GameTime { get; set; }
+    public Vector2 offset;
+    private float glow = 0f;
+    public float MeterLevel { get; private set; } = 0f;
+    private float points = 0f;
+    private float lerpedPoints = 0f;
+    public void SetValue(float value) => points = value;
+    public void SnapValue(float value) { points = value; lerpedPoints = value; }
+    public void Flash() => glow = 1f;
+    public override void OnInitialize()
+    {
+        Width.Set(64, 0f);
+        Height.Set(256, 0f);
+    }
+    public override void Draw(SpriteBatch spriteBatch)
+    {
+        var gameTime = Main.gameTimeCache;
+        var scope = spriteBatch.Scope();
+        {
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            glow *= 54f * dt;
+
+            var rect = GetDimensions().ToRectangle();
+            rect.Offset(offset.ToPoint());
+            int xPadding = 16;
+            int yPadding = 16;
+
+            var bar = Assets.Textures.UI.KrillMeter.Asset.Value;
+            var pixel = TextureAssets.MagicPixel.Value;
+            var perlin = Assets.Textures.Noise.Perlin.Asset.Value;
+            var vein = Assets.Textures.Noise.Vein.Asset.Value;
+            var shader = Assets.Effects.MeterShader.Asset.Value;
+
+            lerpedPoints = MathHelper.Lerp(lerpedPoints, points, dt * 5f);
+            MeterLevel = lerpedPoints % 1f;
+
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.Default, Main.Rasterizer, null, Main.UIScaleMatrix);
+            spriteBatch.Draw(bar, rect, null, Color.White);
+
+            int availablePoints = (int)points;
+            var textPos = rect.Bottom() + new Vector2(0, 50);
+            var text = availablePoints.ToString();
+            var font = FontAssets.DeathText.Value;
+            var origin = font.MeasureString(text) / 2f;
+            ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, text, textPos, Color.White, Color.Blue with { A = 0 } * 0.5f, 0f, origin, Vector2.One, -1, 4f);
+
+            rect.X += xPadding;
+            rect.Width -= xPadding * 2;
+            rect.Y += yPadding;
+            rect.Height -= yPadding * 2;
+
+            var rasterizer = spriteBatch.rasterizerState;
+            spriteBatch.End();
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, rasterizer, Assets.Effects.MeterShader.Asset.Value, Main.UIScaleMatrix);
+
+            spriteBatch.graphicsDevice.Textures[1] = vein;
+            spriteBatch.graphicsDevice.Textures[2] = perlin;
+            shader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
+            shader.Parameters["uSize"].SetValue(rect.Size());
+            shader.Parameters["uProgress"].SetValue(MeterLevel);
+            shader.CurrentTechnique.Passes[0].Apply();
+
+            var color = Color.Lerp(new Color(0f, 0.3f, 0.8f), Color.White, glow * 0.5f);
+            spriteBatch.Draw(pixel, rect, null, color);
+        }
+        scope.Dispose();
+    }
+}
+public class KrillPointBarState : UIState
 {
     private GameTime GameTime { get; set; }
-    private static UIPanel meter;
-    private static float glow = 0f;
-    private static float meterLevel = 0f;
-    private static float krillPointsLerped = 0f;
+    private static KrillPointBar meter;
     private static float enter = 0f;
     private static SoundStyle Plink = Assets.Sounds.UI.KrillParticle.Asset with { Type = SoundType.Sound, Volume = 0.4f, MaxInstances = 3, PitchVariance = 1.5f };
     private static SoundStyle Spawn = Assets.Sounds.UI.SpawnKrillParticle.Asset with { Type = SoundType.Sound, Volume = 0.45f, MaxInstances = 1, PitchVariance = 0.2f };
     private static SoundStyle NewPoint = Assets.Sounds.UI.GetKrillPoint.Asset with { Type = SoundType.Sound, Volume = 0.6f, MaxInstances = 1, PitchVariance = 0f };
     public override void OnInitialize()
     {
-        meter = new UIPanel();
-        meter.Width.Set(64, 0f);
-        meter.Height.Set(256, 0f);
-        meter.HAlign = 0.95f;
-        meter.VAlign = 0.5f; 
-        meter.BackgroundColor = meter.BorderColor = Color.Transparent;
+        meter = new()
+        {
+            HAlign = 0.95f,
+            VAlign = 0.5f
+        };
+        meter.SnapValue(KTP.KrillPoints);
         Append(meter);
     }
     private static KrillTreePlayer KTP => Main.LocalPlayer.GetModPlayer<KrillTreePlayer>();
@@ -93,7 +161,6 @@ public class KrillPointBar : UIState
     public override void Update(GameTime gameTime)
     {
         if (Main.gamePaused) return;
-        glow *= 54f * (float)gameTime.ElapsedGameTime.TotalSeconds;
         GameTime = gameTime;
         enter = MathHelper.Clamp(enter + (float)gameTime.ElapsedGameTime.TotalSeconds * (particles.Count > 0 ? 1 : -1), 0, 1);
         for (int i = particles.Count - 1; i  >= 0; i--)
@@ -102,7 +169,7 @@ public class KrillPointBar : UIState
             if (!particle.Update((float)gameTime.ElapsedGameTime.TotalSeconds))
             {
                 particles.RemoveAt(i);
-                glow = 1f;
+                meter.Flash();
                 var prev = KTP.KrillPoints;
                 KTP.KrillPoints += particle.Value / 100f;
                 if ((int)KTP.KrillPoints > (int)prev)
@@ -121,66 +188,18 @@ public class KrillPointBar : UIState
             }
             else particles[i] = particle;
         }
+        meter.SetValue(KTP.KrillPoints);
     }
     public override void Draw(SpriteBatch spriteBatch)
     {
-        if (GameTime == null) return;
-        float dt = (float)GameTime.ElapsedGameTime.TotalSeconds;
-
-        var rect = meter.GetDimensions().ToRectangle();
-        int shift = (int)((1 - Math.Pow(enter, 0.4f)) * 200);
-        rect.X += shift;
-        int xPadding = 16;
-        int yPadding = 16;
-
-        var bar = Assets.Textures.UI.KrillMeter.Asset.Value;
-        var pixel = TextureAssets.MagicPixel.Value;
-        var perlin = Assets.Textures.Noise.Perlin.Asset.Value;
-        var vein = Assets.Textures.Noise.Vein.Asset.Value;
-        var shader = Assets.Effects.MeterShader.Asset.Value;
-
-        krillPointsLerped = MathHelper.Lerp(krillPointsLerped, KTP.KrillPoints, dt * 5f);
-        meterLevel = krillPointsLerped % 1f;
-
-        spriteBatch.Draw(bar, rect, null, Color.White);
-
-        int availablePoints = (int)KTP.KrillPoints;
-        var textPos = rect.Bottom() + new Vector2(0, 50);
-        var text = availablePoints.ToString();
-        var font = FontAssets.DeathText.Value;
-        var origin = font.MeasureString(text) / 2f;
-        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, text, textPos, Color.White, Color.Blue with { A = 0 } * 0.5f, 0f, origin, Vector2.One, -1, 4f);
-
-        rect.X += xPadding;
-        rect.Width -= xPadding * 2;
-        rect.Y += yPadding;
-        rect.Height -= yPadding * 2;
-
-        var rasterizer = spriteBatch.rasterizerState;
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, rasterizer, Assets.Effects.MeterShader.Asset.Value, Main.UIScaleMatrix);
-
-        spriteBatch.graphicsDevice.Textures[1] = vein;
-        spriteBatch.graphicsDevice.Textures[2] = perlin;
-        shader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
-        shader.Parameters["uSize"].SetValue(rect.Size());
-        shader.Parameters["uProgress"].SetValue(meterLevel);
-        shader.CurrentTechnique.Passes[0].Apply();
-
-        var color = Color.Lerp(new Color(0f, 0.3f, 0.8f), Color.White, glow * 0.5f);
-        spriteBatch.Draw(pixel, rect, null, color);
-
-        spriteBatch.End();
-
+        int shift = (int)((1 - Math.Pow(enter, 0.4f)) * 200 / Main.UIScale);
+        meter.offset = new(shift, 0f);
+        meter.Draw(spriteBatch);
         DrawParticles(spriteBatch);
     }
     private void DrawParticles(SpriteBatch spriteBatch)
     {
-        if (particles.Count == 0)
-        {
-            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
-            return;
-        }
+        if (particles.Count == 0) return;
         var glowShader = Assets.Effects.KrillBallGlow.Asset.Value;
         var particleShader = Assets.Effects.KrillBall.Asset.Value;
         var perlin = Assets.Textures.Noise.Perlin.Asset.Value;
@@ -188,41 +207,44 @@ public class KrillPointBar : UIState
         var circle = Assets.Textures.UI.Circle.Asset.Value;
         var glow = Assets.Textures.UI.Glow.Asset.Value;
 
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, glowShader, Main.GameViewMatrix.TransformationMatrix);
-
-        spriteBatch.graphicsDevice.Textures[1] = grain;
-        spriteBatch.graphicsDevice.Textures[1] = perlin;
-        glowShader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
-        glowShader.CurrentTechnique.Passes[0].Apply();
-        Color color = new(0.4f, 0.7f, 1f);
-        var glorig = glow.Size() / 2f;
-        foreach (var particle in particles)
+        var scope = spriteBatch.Scope();
         {
-            float scale = particle.Radius / (float)glow.Width;
-            scale *= 1.65f;
-            scale *= MathF.Pow(MathHelper.Clamp(particle.Time / 30f, 0, 1), 0.4f);
-            var pos = particle.Position - Main.screenPosition;
-            spriteBatch.Draw(glow, pos, null, color with { A = 0 }, 0f, glorig, scale * particle.Scale, SpriteEffects.None, 0f);
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, glowShader, Main.GameViewMatrix.TransformationMatrix);
+
+            spriteBatch.graphicsDevice.Textures[1] = grain;
+            spriteBatch.graphicsDevice.Textures[1] = perlin;
+            glowShader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
+            glowShader.CurrentTechnique.Passes[0].Apply();
+            Color color = new(0.4f, 0.7f, 1f);
+            var glorig = glow.Size() / 2f;
+            foreach (var particle in particles)
+            {
+                float scale = particle.Radius / (float)glow.Width;
+                scale *= 1.65f;
+                scale *= MathF.Pow(MathHelper.Clamp(particle.Time / 30f, 0, 1), 0.4f);
+                var pos = particle.Position - Main.screenPosition;
+                spriteBatch.Draw(glow, pos, null, color with { A = 0 }, 0f, glorig, scale * particle.Scale, SpriteEffects.None, 0f);
+            }
+
+            spriteBatch.End();
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, particleShader, Main.GameViewMatrix.TransformationMatrix);
+
+            spriteBatch.graphicsDevice.Textures[1] = perlin;
+            particleShader.Parameters["uColor"].SetValue(color.ToVector3());
+            particleShader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
+            particleShader.CurrentTechnique.Passes[0].Apply();
+            var orig = circle.Size() / 2f;
+            foreach (var particle in particles)
+            {
+                float scale = particle.Radius / (float)circle.Width;
+                scale *= MathF.Pow(MathHelper.Clamp(particle.Time / 30f, 0, 1), 0.4f);
+                var pos = particle.Position - Main.screenPosition;
+                spriteBatch.Draw(circle, pos, null, new(particle.NoiseOffset % 1, 0f, 0f), 0f, orig, scale * particle.Scale, SpriteEffects.None, 0f);
+            }
+
+            spriteBatch.End();
         }
-
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, particleShader, Main.GameViewMatrix.TransformationMatrix);
-
-        spriteBatch.graphicsDevice.Textures[1] = perlin;
-        particleShader.Parameters["uColor"].SetValue(color.ToVector3());
-        particleShader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
-        particleShader.CurrentTechnique.Passes[0].Apply();
-        var orig = circle.Size() / 2f;
-        foreach (var particle in particles)
-        {
-            float scale = particle.Radius / (float)circle.Width;
-            scale *= MathF.Pow(MathHelper.Clamp(particle.Time / 30f, 0, 1), 0.4f);
-            var pos = particle.Position - Main.screenPosition;
-            spriteBatch.Draw(circle, pos, null, new(particle.NoiseOffset % 1, 0f, 0f), 0f, orig, scale * particle.Scale, SpriteEffects.None, 0f);
-        }
-
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
+        scope.Dispose();
     }
     private readonly List<KrillParticle> particles = new(128);
     private record struct KrillParticle(Vector2 Position, Vector2 Velocity, float Value, float Time = 0)
@@ -244,7 +266,7 @@ public class KrillPointBar : UIState
             var dimensions = meter.GetDimensions().ToRectangle();
             var targetPos = dimensions.Bottom() + Main.screenPosition;
             targetPos.Y -= 16;
-            targetPos.Y -= meterLevel * 224;
+            targetPos.Y -= meter.MeterLevel * 224;
             float timeToGo = 40f;
             if (Time < timeToGo)
             {

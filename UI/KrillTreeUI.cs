@@ -1,3 +1,4 @@
+using Daybreak.Rendering.V1;
 using FishMode.Common;
 using FishMode.Content.KrillTree;
 using Microsoft.Xna.Framework;
@@ -80,6 +81,8 @@ public class KrillTreeUI : UIState
     private static Player Player => Main.LocalPlayer;
     private static KrillTreePlayer? ModPlayer => Player.TryGetModPlayer<KrillTreePlayer>(out var plr) ? plr : null;
     private static KrillTree? PlayerTree => ModPlayer?.KrillTree;
+    private static readonly RasterizerState ScissorRasterizer = new() { ScissorTestEnable = true };
+    private static Rectangle ScissorRect => panel?.GetDimensions().ToRectangle() ?? Rectangle.Empty;
     private static SoundStyle UnlockKrill = new("FishMode/Assets/Sounds/UI/UnlockKrill", SoundType.Sound)
     {
         Volume = 0.65f,
@@ -104,9 +107,7 @@ public class KrillTreeUI : UIState
     private Vector2 oldMouse;
     private static UIPanel panel;
     private static UIPanel selected;
-    private static UIPanel meter;
-    private static float meterLevel = 0f;
-    private static float krillPointsLerped = 0f;
+    private static KrillPointBar meter;
     internal static float hover = 0f;
     internal static string hoverName;
     internal static string hoverTooltip;
@@ -131,9 +132,6 @@ public class KrillTreeUI : UIState
         RemoveAllChildren();
         if (PlayerTree == null) return;
 
-        krillPointsLerped = ModPlayer.KrillPoints;
-        meterLevel = krillPointsLerped % 1f;
-
         panel = new UIPanel();
         panel.LoadTextures();
         panel.Width.Set(0, 0.55f);
@@ -153,12 +151,12 @@ public class KrillTreeUI : UIState
         selected.BackgroundColor = selected.BorderColor = Color.Transparent;
         panel.Append(selected);
 
-        meter = new UIPanel();
-        meter.Width.Set(64, 0f);
-        meter.Height.Set(256, 0f);
-        meter.HAlign = 1f;
-        meter.VAlign = 0.5f;
-        meter.BackgroundColor = meter.BorderColor = Color.Transparent;
+        meter = new()
+        {
+            HAlign = 1f,
+            VAlign = 0.5f,
+        };
+        meter.SnapValue(ModPlayer.KrillPoints);
         panel.Append(meter);
 
         foreach (var krill in KrillTree.Krills)
@@ -200,6 +198,8 @@ public class KrillTreeUI : UIState
         {
             oldMouse = Main.MouseScreen;
         }
+
+        meter.SetValue(ModPlayer.KrillPoints);
 
         float xRange = 300f;
         float yRange = 200f;
@@ -247,64 +247,67 @@ public class KrillTreeUI : UIState
     }
     public override void Draw(SpriteBatch spriteBatch)
     {
-        hoverCombos = [];
+        if (panel is null || meter is null || selected is null) return;
         HoveringNodeIndex = -1;
+        float dt = (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds;
 
-        if (panel == null) return;
-        if (panel._borderTexture == null) return;
-        if (panel._backgroundTexture == null) return;
-        panel?.DrawPanel(spriteBatch, panel._borderTexture.Value, panel.BorderColor);
-        panel?.DrawPanel(spriteBatch, panel._backgroundTexture.Value, panel.BackgroundColor);
-
-        Zoom = MathHelper.Lerp(Zoom, targetZoom, (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds * 10f);
-
-        var rasterizer = new RasterizerState()
-        {
-            ScissorTestEnable = true
-        };
-        var scissorRect = panel.GetDimensions().ToRectangle();
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, rasterizer, Assets.Effects.UIOceanShader.Asset.Value, Main.UIScaleMatrix);
-        spriteBatch.GraphicsDevice.ScissorRectangle = scissorRect;
-
+        DrawPanel(spriteBatch);
         DrawOcean(spriteBatch);
 
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, rasterizer, null, Main.UIScaleMatrix);
-
+        spriteBatch.rasterizerState = ScissorRasterizer;
+        spriteBatch.GraphicsDevice.ScissorRectangle = ScissorRect;
+        spriteBatch.samplerState = SamplerState.PointClamp;
         foreach (var node in nodes)
             node.DrawConnections(spriteBatch);
         foreach (var node in nodes)
             node.Draw(spriteBatch);
 
-        for (int i = particles.Count - 1; i >= 0; i--)
-        {
-            var particle = particles[i];
-            particle.Update((float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds * 60f);
-            particle.Draw(spriteBatch, Pan, Zoom);
-            if (particle.Scale <= 0f || particle.Alpha <= 0f)
-                particles.RemoveAt(i);
-            else
-                particles[i] = particle;
-        }
-        for (int i = pointCountParticles.Count - 1; i >= 0; i--)
-        {
-            var particle = pointCountParticles[i];
-            particle.Update((float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds * 60f);
-            if (particle.alpha <= 0f)
-                pointCountParticles.RemoveAt(i);
-            else
-                pointCountParticles[i] = particle;
-        }
-
         DrawSelected(spriteBatch);
-
-        DrawMeter(spriteBatch);
-
+        meter.Draw(spriteBatch);
+        DrawParticles(spriteBatch, dt);
         DrawTooltip(spriteBatch);
 
-        hover += (HoveringNodeIndex != -1 ? 10f : -10f) * (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds;
+        hover += (HoveringNodeIndex != -1 ? 10f : -10f) * (float)dt;
         hover = MathHelper.Clamp(hover, 0, 1);
+        hoverCombos = [];
+        Zoom = MathHelper.Lerp(Zoom, targetZoom, (float)dt * 10f);
+    }
+    private static void DrawPanel(SpriteBatch spriteBatch)
+    {
+        if (panel == null) return;
+        if (panel._borderTexture == null) return;
+        if (panel._backgroundTexture == null) return;
+        panel?.DrawPanel(spriteBatch, panel._borderTexture.Value, panel.BorderColor);
+        panel?.DrawPanel(spriteBatch, panel._backgroundTexture.Value, panel.BackgroundColor);
+    }
+    private static void DrawParticles(SpriteBatch spriteBatch, float dt)
+    {
+        var scope = spriteBatch.Scope();
+        {
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.LinearClamp, DepthStencilState.Default, ScissorRasterizer, null, Main.UIScaleMatrix);
+            spriteBatch.GraphicsDevice.ScissorRectangle = ScissorRect;
+            for (int i = particles.Count - 1; i >= 0; i--)
+            {
+                var particle = particles[i];
+                particle.Update((float)dt * 60f);
+                particle.Draw(spriteBatch, Pan, Zoom);
+                if (particle.Scale <= 0f || particle.Alpha <= 0f)
+                    particles.RemoveAt(i);
+                else
+                    particles[i] = particle;
+            }
+            for (int i = pointCountParticles.Count - 1; i >= 0; i--)
+            {
+                var particle = pointCountParticles[i];
+                particle.Update((float)dt * 60f);
+                if (particle.alpha <= 0f)
+                    pointCountParticles.RemoveAt(i);
+                else
+                    pointCountParticles[i] = particle;
+            }
+            foreach (var p in pointCountParticles) p.Draw(meter.GetDimensions().ToRectangle().Bottom() + new Vector2(0, 50), spriteBatch);
+        }
+        scope.Dispose();
     }
     private void DrawSelected(SpriteBatch spriteBatch)
     {
@@ -407,198 +410,177 @@ public class KrillTreeUI : UIState
             spriteBatch.Draw(texture, pos + krillOffset, null, Color.White, rot, texture.Size() / 2f, scale, SpriteEffects.None, 0f);
         }
     }
-    private static void DrawMeter(SpriteBatch spriteBatch)
-    {
-        float dt = (float)Main.gameTimeCache.ElapsedGameTime.TotalSeconds;
-        foreach (var p in pointCountParticles)
-            p.Update(dt);
-
-        var rect = meter.GetDimensions().ToRectangle();
-        int xPadding = 16;
-        int yPadding = 16;
-
-        var bar = Assets.Textures.UI.KrillMeter.Asset.Value;
-        var pixel = TextureAssets.MagicPixel.Value;
-        var perlin = Assets.Textures.Noise.Perlin.Asset.Value;
-        var vein = Assets.Textures.Noise.Vein.Asset.Value;
-        var shader = Assets.Effects.MeterShader.Asset.Value;
-
-        krillPointsLerped = MathHelper.Lerp(krillPointsLerped, ModPlayer.KrillPoints, dt * 2f);
-        meterLevel = krillPointsLerped % 1f;
-
-        spriteBatch.Draw(bar, rect, null, Color.White);
-
-        int availablePoints = (int)ModPlayer.KrillPoints;
-        var textPos = rect.Bottom() + new Vector2(0, 50);
-        var text = availablePoints.ToString();
-        var font = FontAssets.DeathText.Value;
-        var origin = font.MeasureString(text) / 2f;
-        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, text, textPos, Color.White, Color.Blue with { A = 0 } * 0.5f, 0f, origin, Vector2.One, -1, 4f);
-        foreach (var p in pointCountParticles)
-            p.Draw(textPos, Main.spriteBatch);
-
-        rect.X += xPadding;
-        rect.Width -= xPadding * 2;
-        rect.Y += yPadding;
-        rect.Height -= yPadding * 2;
-
-        var rasterizer = spriteBatch.rasterizerState;
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, rasterizer, Assets.Effects.MeterShader.Asset.Value, Main.UIScaleMatrix);
-
-        spriteBatch.graphicsDevice.Textures[1] = vein;
-        spriteBatch.graphicsDevice.Textures[2] = perlin;
-        shader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
-        shader.Parameters["uSize"].SetValue(rect.Size());
-        shader.Parameters["uProgress"].SetValue(meterLevel);
-        shader.CurrentTechnique.Passes[0].Apply();
-
-        spriteBatch.Draw(pixel, rect, null, new Color(0f, 0.3f, 0.8f));
-    }
     private static void DrawTooltip(SpriteBatch spriteBatch)
     {
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.UIScaleMatrix);
-        if (hover == 0f || string.IsNullOrEmpty(hoverName) || string.IsNullOrEmpty(hoverTooltip)) return;
-
-        Color color = hoverLevel switch
+        var scope = spriteBatch.Scope();
         {
-            1 => Color.White,
-            2 => Color.LightGreen,
-            3 => Color.Cyan,
-            4 => Color.Orange,
-            _ => Color.Red
-        };
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, ScissorRasterizer, null, Main.UIScaleMatrix);
+            spriteBatch.GraphicsDevice.ScissorRectangle = ScissorRect;
+            if (hover == 0f || string.IsNullOrEmpty(hoverName) || string.IsNullOrEmpty(hoverTooltip)) return;
 
-        var pos = Main.MouseScreen;
-        pos.Y -= 5;
-        pos.X += 40;
-        float eased = MathF.Pow(hover, 0.5f);
-        var font = FontAssets.DeathText.Value;
-        var font2 = FontAssets.MouseText.Value;
-
-        float titleScale = 0.6f;
-        float tooltipScale = 1f;
-        int textLength = (int)(font.MeasureString(hoverName).X * titleScale); //add space for stars
-        int paddedLengthForStars = textLength + 250;
-        textLength = Math.Max(textLength, 200);
-
-        var leftEdge = new Rectangle(0, 0, 10, 20);
-        var rightEdge = new Rectangle(12, 0, 10, 20);
-        var middle = new Rectangle(10, 0, 2, 20);
-
-        var rect = new Rectangle((int)pos.X + leftEdge.Width, (int)pos.Y, (int)((paddedLengthForStars - leftEdge.Width) * eased), leftEdge.Height);
-
-        var bar = Assets.Textures.UI.TitleBar.Asset.Value;
-        var gradient = Assets.Textures.UI.Gradient.Asset.Value;
-        int gradientHeight = 150 + (KrillTree.AtGameStageForKrill(hoverLevel) ? hoverCombos.Count : 0) * 100;
-
-        var gradientRect = rect;
-        gradientRect.Y += leftEdge.Height;
-        gradientRect.X -= leftEdge.Width;
-        gradientRect.Width += leftEdge.Width;
-        gradientRect.Height = gradientHeight;
-        spriteBatch.Draw(gradient, gradientRect, null, Color.White);
-
-        spriteBatch.Draw(bar, pos, leftEdge, Color.White);
-        spriteBatch.Draw(bar, rect, middle, Color.White);
-        spriteBatch.Draw(bar, pos + Vector2.UnitX * (rect.Width + rightEdge.Width), rightEdge, Color.White);
-
-        spriteBatch.End();
-        var matrix = Main.UIScaleMatrix;
-        float minSkew = -0.1f;
-        float maxSkew = -0.2f;
-        var skew = MathHelper.Lerp(minSkew, maxSkew, MathF.Sin((float)Main.timeForVisualEffects / 60f) * 0.5f + 0.5f);
-        matrix.M21 = skew;
-        var invMatrix = Matrix.Invert(matrix);
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.AnisotropicClamp, DepthStencilState.Default, Main.Rasterizer, null, matrix);
-
-        var untransformedTextPos = pos + new Vector2(15, 25);
-        var textPos = Vector2.Transform(untransformedTextPos, invMatrix);
-        textPos.X -= (skew - minSkew) * 20;
-        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, hoverName, textPos, Color.Black * eased, color * eased, 0f, Vector2.Zero, Vector2.One * titleScale);
-
-        spriteBatch.End();
-        spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, Main.Rasterizer, null, Main.UIScaleMatrix);
-
-        string tooltip = font.CreateWrappedText(hoverTooltip, textLength / tooltipScale * 3.5f, Language.ActiveCulture.CultureInfo);
-        var tooltipPos = untransformedTextPos + new Vector2(-8, 40);
-        ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, tooltip, tooltipPos, Color.White * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
-
-        if (hoverCombos.Count > 0 && KrillTree.AtGameStageForKrill(hoverLevel))
-        {
-            var combinesWithPos = tooltipPos + Vector2.UnitY * (font2.MeasureString(tooltip).Y + 16f);
-            var combinesWithText = ModImpl.Instance.GetLocalization("UI.CombinesWithText").Value;
-            ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, combinesWithText, combinesWithPos, Color.Gray * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
-
-            var comboPos = combinesWithPos + Vector2.UnitX * (font2.MeasureString(combinesWithText).X + 16f);
-            for (int i = 0; i < hoverCombos.Count; i++)
+            Color color = hoverLevel switch
             {
-                var type = HoveringNodeIndex >= 0 ? HoveringNodeIndex : ModPlayer.KrillTree.activated[HoveringNodeIndex + 10];
-                var comboType = KrillTree.Krills[hoverCombos[i]];
-                var comboText = comboType.DisplayName + ": ";
-                var (highest, lowest) = hoverLevel > comboType.Level ? (type, hoverCombos[i]) : (hoverCombos[i], type);
-                var comboTooltip = KrillTree.Krills[highest].GetLocalization($"Combine_{KrillTree.Krills[lowest].DisplayName}").Value;
-                var comboColor = comboType.Level switch
+                1 => Color.White,
+                2 => Color.LightGreen,
+                3 => Color.Cyan,
+                4 => Color.Orange,
+                _ => Color.Red
+            };
+
+            var pos = Main.MouseScreen;
+            pos.Y -= 5;
+            pos.X += 40;
+            float eased = MathF.Pow(hover, 0.5f);
+            var font = FontAssets.DeathText.Value;
+            var font2 = FontAssets.MouseText.Value;
+
+            float titleScale = 0.6f;
+            float tooltipScale = 1f;
+            int textLength = (int)(font.MeasureString(hoverName).X * titleScale); //add space for stars
+            int paddedLengthForStars = textLength + 250;
+            textLength = Math.Max(textLength, 200);
+
+            var leftEdge = new Rectangle(0, 0, 10, 20);
+            var rightEdge = new Rectangle(12, 0, 10, 20);
+            var middle = new Rectangle(10, 0, 2, 20);
+
+            var rect = new Rectangle((int)pos.X + leftEdge.Width, (int)pos.Y, (int)((paddedLengthForStars - leftEdge.Width) * eased), leftEdge.Height);
+
+            var bar = Assets.Textures.UI.TitleBar.Asset.Value;
+            var gradient = Assets.Textures.UI.Gradient.Asset.Value;
+            int gradientHeight = 150 + (KrillTree.AtGameStageForKrill(hoverLevel) ? hoverCombos.Count : 0) * 100;
+
+            var gradientRect = rect;
+            gradientRect.Y += leftEdge.Height;
+            gradientRect.X -= leftEdge.Width;
+            gradientRect.Width += leftEdge.Width;
+            gradientRect.Height = gradientHeight;
+
+            if (gradientRect.Bottom > ScissorRect.Bottom)
+            {
+                rect.Y -= (gradientRect.Bottom - ScissorRect.Bottom);
+                pos.Y -= (gradientRect.Bottom - ScissorRect.Bottom);
+                gradientRect.Y -= (gradientRect.Bottom - ScissorRect.Bottom);
+            }
+            if (gradientRect.Right > ScissorRect.Right)
+            {
+                rect.X -= (gradientRect.Right - ScissorRect.Right);
+                pos.X -= (gradientRect.Right - ScissorRect.Right);
+                gradientRect.X -= (gradientRect.Right - ScissorRect.Right);
+            }
+
+            spriteBatch.Draw(gradient, gradientRect, null, Color.White);
+
+            spriteBatch.Draw(bar, pos, leftEdge, Color.White);
+            spriteBatch.Draw(bar, rect, middle, Color.White);
+            spriteBatch.Draw(bar, pos + Vector2.UnitX * (rect.Width + rightEdge.Width), rightEdge, Color.White);
+
+            spriteBatch.End();
+            var matrix = Main.UIScaleMatrix;
+            float minSkew = -0.1f;
+            float maxSkew = -0.2f;
+            var skew = MathHelper.Lerp(minSkew, maxSkew, MathF.Sin((float)Main.timeForVisualEffects / 60f) * 0.5f + 0.5f);
+            matrix.M21 = skew;
+            var invMatrix = Matrix.Invert(matrix);
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.AnisotropicClamp, DepthStencilState.Default, ScissorRasterizer, null, matrix);
+            spriteBatch.GraphicsDevice.ScissorRectangle = ScissorRect;
+
+            var untransformedTextPos = pos + new Vector2(15, 25);
+            var textPos = Vector2.Transform(untransformedTextPos, invMatrix);
+            textPos.X -= (skew - minSkew) * 20;
+            ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font, hoverName, textPos, Color.Black * eased, color * eased, 0f, Vector2.Zero, Vector2.One * titleScale);
+
+            spriteBatch.End();
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.Default, ScissorRasterizer, null, Main.UIScaleMatrix);
+            spriteBatch.GraphicsDevice.ScissorRectangle = ScissorRect;
+
+            string tooltip = font.CreateWrappedText(hoverTooltip, textLength / tooltipScale * 3.5f, Language.ActiveCulture.CultureInfo);
+            var tooltipPos = untransformedTextPos + new Vector2(-8, 40);
+            ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, tooltip, tooltipPos, Color.White * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
+
+            if (hoverCombos.Count > 0 && KrillTree.AtGameStageForKrill(hoverLevel))
+            {
+                var combinesWithPos = tooltipPos + Vector2.UnitY * (font2.MeasureString(tooltip).Y + 16f);
+                var combinesWithText = ModImpl.Instance.GetLocalization("UI.CombinesWithText").Value;
+                ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, combinesWithText, combinesWithPos, Color.Gray * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
+
+                var comboPos = combinesWithPos + Vector2.UnitX * (font2.MeasureString(combinesWithText).X + 16f);
+                for (int i = 0; i < hoverCombos.Count; i++)
                 {
-                    1 => Color.White,
-                    2 => Color.LightGreen,
-                    3 => Color.Cyan,
-                    4 => Color.Orange,
-                    _ => Color.Red
-                };
-                comboText += comboTooltip;
-                comboText = font2.CreateWrappedText(comboText, paddedLengthForStars * 0.55f, Language.ActiveCulture.CultureInfo);
-                ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, comboText, comboPos, comboColor * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
-                comboPos.Y += font2.MeasureString(comboText).Y;
+                    var type = HoveringNodeIndex >= 0 ? HoveringNodeIndex : ModPlayer.KrillTree.activated[HoveringNodeIndex + 10];
+                    var comboType = KrillTree.Krills[hoverCombos[i]];
+                    var comboText = comboType.DisplayName + ": ";
+                    var (highest, lowest) = hoverLevel > comboType.Level ? (type, hoverCombos[i]) : (hoverCombos[i], type);
+                    var comboTooltip = KrillTree.Krills[highest].GetLocalization($"Combine_{KrillTree.Krills[lowest].DisplayName}").Value;
+                    var comboColor = comboType.Level switch
+                    {
+                        1 => Color.White,
+                        2 => Color.LightGreen,
+                        3 => Color.Cyan,
+                        4 => Color.Orange,
+                        _ => Color.Red
+                    };
+                    comboText += comboTooltip;
+                    comboText = font2.CreateWrappedText(comboText, paddedLengthForStars * 0.55f, Language.ActiveCulture.CultureInfo);
+                    ChatManager.DrawColorCodedStringWithShadow(spriteBatch, font2, comboText, comboPos, comboColor * eased, Color.Black * eased, 0f, Vector2.Zero, Vector2.One * tooltipScale);
+                    comboPos.Y += font2.MeasureString(comboText).Y;
+                }
+            }
+
+            List<Vector2> starPositions = hoverLevel switch
+            {
+                1 => [Vector2.Zero],
+                2 => [new(-20, 0), new(20, 0)],
+                3 => [new(-20, -10), new(0, 10), new(20, -10)],
+                4 => [new(-20, -5), new(20, -5), new(-20, 25), new(20, 25)],
+                _ => [new(-40, -5), new(0, -5), new(40, -5), new(-20, 20), new(20, 20)],
+            };
+            var basePos = pos + new Vector2(paddedLengthForStars - 60, 45);
+            var star = Assets.Textures.UI.Star.Asset.Value;
+            float time = (float)Main.timeForVisualEffects / 60f;
+            foreach (var offset in starPositions)
+            {
+                var starpos = basePos + offset;
+                float rot = MathF.Sin(time * 3.2f + offset.Y + offset.X) * 0.1f;
+                float bob = MathF.Sin(time * 2.6f + offset.Y + offset.X) * 2f;
+                starpos.Y += bob;
+                float alpha = Math.Max(0, eased * 3 - 2);
+                spriteBatch.Draw(star, starpos, null, color * alpha, rot, star.Size() / 2f, 1f, SpriteEffects.None, 0f);
             }
         }
-
-        List<Vector2> starPositions = hoverLevel switch
-        {
-            1 => [Vector2.Zero],
-            2 => [new(-20, 0), new(20, 0)],
-            3 => [new(-20, -10), new(0, 10), new(20, -10)],
-            4 => [new(-20, -5), new(20, -5), new(-20, 25), new(20, 25)],
-            _ => [new(-40, -5), new(0, -5), new(40, -5), new(-20, 20), new(20, 20)],
-        };
-        var basePos = pos + new Vector2(paddedLengthForStars - 60, 45);
-        var star = Assets.Textures.UI.Star.Asset.Value;
-        float time = (float)Main.timeForVisualEffects / 60f;
-        foreach(var offset in starPositions)
-        {
-            var starpos = basePos + offset;
-            float rot = MathF.Sin(time * 3.2f + offset.Y + offset.X) * 0.1f;
-            float bob = MathF.Sin(time * 2.6f + offset.Y + offset.X) * 2f;
-            starpos.Y += bob;
-            float alpha = Math.Max(0, eased * 3 - 2);
-            spriteBatch.Draw(star, starpos, null, color * alpha, rot, star.Size() / 2f, 1f, SpriteEffects.None, 0f);
-        }
+        scope.Dispose();
     }
     private static void DrawOcean(SpriteBatch spriteBatch)
     {
-        var rect = panel.GetInnerDimensions().ToRectangle();
+        var scope = spriteBatch.Scope();
+        {
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, ScissorRasterizer, Assets.Effects.UIOceanShader.Asset.Value, Main.UIScaleMatrix);
+            spriteBatch.GraphicsDevice.ScissorRectangle = ScissorRect;
 
-        var pixel = TextureAssets.MagicPixel.Value;
-        var perlin = Assets.Textures.Noise.Perlin.Asset.Value;
-        var vein = Assets.Textures.Noise.Vein.Asset.Value;
-        var shader = Assets.Effects.UIOceanShader.Asset.Value;
+            var rect = panel.GetInnerDimensions().ToRectangle();
 
-        var color = new Color(0.15f, 0.05f, 0.6f);
+            var pixel = TextureAssets.MagicPixel.Value;
+            var perlin = Assets.Textures.Noise.Perlin.Asset.Value;
+            var vein = Assets.Textures.Noise.Vein.Asset.Value;
+            var shader = Assets.Effects.UIOceanShader.Asset.Value;
 
-        spriteBatch.graphicsDevice.Textures[1] = vein;
-        spriteBatch.graphicsDevice.Textures[2] = perlin;
-        spriteBatch.graphicsDevice.SamplerStates[1] = SamplerState.LinearWrap;
-        spriteBatch.graphicsDevice.SamplerStates[2] = SamplerState.LinearWrap;
-        shader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
-        shader.Parameters["uSize"].SetValue(rect.Size());
-        shader.Parameters["uVeinSize"].SetValue(vein.Size());
-        shader.Parameters["uPerlinSize"].SetValue(perlin.Size());
-        shader.Parameters["uZoom"].SetValue(Zoom);
-        shader.Parameters["uPosition"].SetValue(Pan / rect.Size());
-        shader.CurrentTechnique.Passes[0].Apply();
+            var color = new Color(0.15f, 0.05f, 0.6f);
 
-        spriteBatch.Draw(pixel, rect, null, color);
+            spriteBatch.graphicsDevice.Textures[1] = vein;
+            spriteBatch.graphicsDevice.Textures[2] = perlin;
+            spriteBatch.graphicsDevice.SamplerStates[1] = SamplerState.LinearWrap;
+            spriteBatch.graphicsDevice.SamplerStates[2] = SamplerState.LinearWrap;
+            shader.Parameters["uTime"].SetValue((float)Main.timeForVisualEffects / 60f);
+            shader.Parameters["uSize"].SetValue(rect.Size());
+            shader.Parameters["uVeinSize"].SetValue(vein.Size());
+            shader.Parameters["uPerlinSize"].SetValue(perlin.Size());
+            shader.Parameters["uZoom"].SetValue(Zoom);
+            shader.Parameters["uPosition"].SetValue(Pan / rect.Size());
+            shader.CurrentTechnique.Passes[0].Apply();
+
+            spriteBatch.Draw(pixel, rect, null, color);
+        }
+        scope.Dispose();
     }
 }
 

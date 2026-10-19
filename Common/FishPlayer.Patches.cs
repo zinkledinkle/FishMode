@@ -1,4 +1,3 @@
-using FishMode.Common.VanillaAccessoryChanges;
 using Microsoft.Xna.Framework;
 using Mono.Cecil.Cil;
 using MonoMod.Cil;

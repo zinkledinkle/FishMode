@@ -1,5 +1,5 @@
 using FishMode.Common;
-using FishMode.Common.VanillaChanges.VanillaAccessoryChanges;
+using FishMode.Common.VanillaChanges.VanillaChanges.Accessories;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System.Collections.Generic;

@@ -4,7 +4,6 @@ using DragonLens.Content.Tools.Visualization;
 using DragonLens.Core.Loaders.UILoading;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Mono.Cecil;
 using MonoMod.Cil;
 using System;
 using System.Collections.Generic;
@@ -12,7 +11,6 @@ using System.Linq;
 using System.Reflection;
 using Terraria;
 using Terraria.ModLoader;
-using Terraria.UI;
 
 namespace FishMode.Common.Interfaces;
 
@@ -26,27 +24,11 @@ public class RadialHitboxProjectileManager
     [OnLoad]
     public static void Load()
     {
-        IL_Projectile.Damage_PVE_Inner += Patch;
-        IL_Projectile.Damage_EVP += Patch;
-        IL_Projectile.Damage_PVP += Patch;
-        void Patch(ILContext il)
+        On_Projectile.Colliding += static (orig, self, rect, targetRect) =>
         {
-            var c = new ILCursor(il);
-            var collideMethod = typeof(Projectile).GetMethod(nameof(Projectile.Colliding), BindingFlags.Public | BindingFlags.Instance);
-            if (collideMethod is null) return;
-            while (c.TryGotoNext(MoveType.Before, i => i.MatchCall(collideMethod)))
-            {
-                var label = c.DefineLabel();
-                c.EmitBr(label);
-                c.Index++;
-                c.MarkLabel(label);
-                c.EmitDelegate((Projectile self, Rectangle projHitbox, Rectangle targetHitbox) =>
-                {
-                    if (self.ModProjectile is not IRadialHitboxProjectile radial) return self.Colliding(projHitbox, targetHitbox);
-                    return CircleVAABBCollision(self.Center, radial.Radius, targetHitbox);
-                });
-            }
-        }
+            if (self.ModProjectile is not IRadialHitboxProjectile radial) return orig(self, rect, targetRect);
+            return CircleVAABBCollision(self.Center, radial.Radius, targetRect);
+        };
     }
     private static bool CircleVAABBCollision(Vector2 circleCenter, float radius, Rectangle aabb)
     {
